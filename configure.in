@@ -12,8 +12,8 @@ AC_SUBST(QPIPE_FEATURES_DEFINES)
 AC_SUBST(NEWLINE)
 
 AC_PREREQ(2.50)
-AC_PROG_RANLIB
 AC_PROG_CXX
+AC_PROG_RANLIB
 
 AC_MSG_NOTICE(Configuring QPipe)
 
@@ -247,6 +247,7 @@ do
    QPIPE_FEATURES_DEFINES="${QPIPE_FEATURES_DEFINES}@NEWLINE@export USE_$f="
 done
 
+
 # ----------------- finish up -------------------
 # names of the variables that get substituted in files; for example,
 # write @ARCHOS@ somewhere in a written file to get it substituted
@@ -259,6 +260,23 @@ AC_SUBST(QPIPE_VERSION_REV)
 AC_SUBST(QPIPE_VERSION)
 AC_SUBST(BDB_HOME)
 
+# basic flags/libs every arch needs
+CXXFLAGS="-g3 -O3 -Wall -Wcast-align -Wextra -Wfloat-equal \
+	-Wconversion -Wno-system-headers -D_REENTRANT"
+LDADD="-lnsl -ldl -lm -lpthread -L$BDB_HOME/lib"
+LDFLAGS="-Wl,$BDB_HOME/lib"
+if test "$ARCHOS" = "SPARC_SUN"; then
+    LDADD="$LDADD -lsocket -lrt"
+    LDFLAGS="$LDFLAGS -Wl,-R"
+else
+    LDADD="$LDADD -lboost_regex"
+    LDFLAGS="$LDFLAGS -Wl,--rpath"
+fi
+
+AC_SUBST(CXXFLAGS)
+AC_SUBST(LDADD)
+AC_SUBST(LDFLAGS)
+    
 
 # MY_AC_CONFIG_FILES(filename)
 # do AC_CONFIG_FILES(filename, chmod a-w filename)
@@ -281,7 +299,7 @@ define([MY_AC_CONFIG_EXE_FILES],
   fi
 }])
 #MY_AC_CONFIG_FILES([Makefile src/Makefile])
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile src/trace/Makefile])
 
 
 AC_OUTPUT()

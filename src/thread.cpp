@@ -1,6 +1,17 @@
+#include "thread.h"
+#include "namespace.h"
+
+/** @fn    : start_thread(void*)
+ *  @brief : Receives a thread as argument and it calls its run() function. When this function returns, it deletes the object.
+ *  @note  : The passed thread_object is deleted here. The caller should delete only the thread hanlde.
+ */
+
+void* start_thread(void* thread_object) {
+  thread_t* thread = (thread_t*)thread_object;
+  return thread->run();
+}
 
 
-#include <pthread_wrappers.h>
 
 ////////////////////////////////////////////////////////////
 // protect against mutex faults
@@ -136,3 +147,5 @@ int pthread_cond_wait_wrapper(pthread_cond_t *cond, pthread_mutex_t *mutex)
   // fprintf(stderr, "COND wait 0x%x done by %d\n", cond, pthread_self());
   return ret;
 }
+
+#include "namespace.h"

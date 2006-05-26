@@ -13,6 +13,9 @@
 // for Dbt class
 #include <db_cxx.h>
 
+// include me last!!!
+#include "namespace.h"
+
 #define DEFAULT_BUFFER_PAGES 100
 /**
  * class tuple_t
@@ -249,6 +252,7 @@ protected:
 class tuple_buffer_t {
 private:
     page_buffer_t page_buffer;
+    size_t page_size;
     
     pthread_mutex_t init_lock;
     pthread_cond_t init_notify;
@@ -362,9 +366,9 @@ public:
     tuple_buffer_t(size_t tuple_size,
                    int num_pages=DEFAULT_BUFFER_PAGES,
                    int page_size=4096)
-        : page_buffer(page_size)
+        : page_buffer(num_pages)
     {
-        init(tuple_size, num_pages);
+        init(tuple_size, page_size);
     }
     ~tuple_buffer_t();
 
@@ -374,8 +378,8 @@ protected:
     // cancelled
     int check_page_full();
     
-    void init(size_t tuple_size, int num_pages);
+    void init(size_t tuple_size, size_t num_pages);
 };
 
-
+#include "namespace.h"
 #endif

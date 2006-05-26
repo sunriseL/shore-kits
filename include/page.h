@@ -2,8 +2,11 @@
 #ifndef _page_h
 #define _page_h
 
-#include <pthread.h>
+#include "thread.h"
 #include <new>
+
+// include me last!!!
+#include "namespace.h"
 
 class page_t {
 private:
@@ -107,4 +110,5 @@ private:
     void init(int capacity, int threshold);
 };
 
+#include "namespace.h"
 #endif

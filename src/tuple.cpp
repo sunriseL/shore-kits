@@ -1,5 +1,8 @@
 #include "tuple.h"
-#include "pthread_wrappers.h"
+#include "thread.h"
+
+// include me last!
+#include "namespace.h"
 
 int tuple_buffer_t::check_page_full() {
     // next page?
@@ -59,9 +62,11 @@ void tuple_buffer_t::close_buffer() {
     page_buffer.stop_reading();
 }
 
-void tuple_buffer_t::init(size_t tuple_size, int num_pages) {
+void tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
     input_arrived = false;
     initialized = false;
+    tuple_size = _tuple_size;
+    page_size = _page_size;
 }
 
 /**
@@ -80,3 +85,4 @@ void tuple_buffer_t::init_buffer() {
 }
 
 
+#include "namespace.h"

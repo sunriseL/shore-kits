@@ -1,5 +1,8 @@
 #include "page.h"
-#include "pthread_wrappers.h"
+#include "thread.h"
+
+// include me last!
+#include "namespace.h"
 
 void page_buffer_t::init(int capacity, int threshold) {
     page_buffer_t::capacity = capacity;
@@ -170,3 +173,5 @@ page_buffer_t::~page_buffer_t() {
         free(page);
     }
 }
+
+#include "namespace.h"

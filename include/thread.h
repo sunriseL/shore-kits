@@ -1,16 +1,24 @@
-
-
-#ifndef __MUTEX_H__
-#define __MUTEX_H__
+// -*- C++ -*-
+#ifndef __THREAD_H
+#define __THREAD_H
 
 // always the first include!
 #include <pthread.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cerrno>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
+// include me last!!!
+#include "namespace.h"
 
-//#include "dlmalloc.h"
+extern "C" void *start_thread(void *);
+
+class thread_t {
+ public:
+    virtual void *run()=0;
+
+    virtual ~thread_t() { }
+};
 
 ////////////////////////////////////////////////////////////
 // protect against mutex faults
@@ -29,4 +37,5 @@ int pthread_cond_wait_wrapper(pthread_cond_t *cond,
                               pthread_mutex_t *mutex);
 
 
-#endif /* __MUTEX_H__ */
+#include "namespace.h"
+#endif  /* __THREAD_H */
