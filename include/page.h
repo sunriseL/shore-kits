@@ -3,6 +3,7 @@
 #define _page_h
 
 #include <pthread.h>
+#include <new>
 
 class page_t {
 private:
