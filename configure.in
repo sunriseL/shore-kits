@@ -1,0 +1,295 @@
+# configure.in for QPipe         -*- sh -*-
+# Process this file with autoconf to produce a configure script. 
+AC_INIT(THIS_IS_QPIPE)
+
+# find system type (using this macro means we must include
+# the files install-sh, config.sub, and config.guess (all from
+# the autoconf distribution) in our source tree!)
+AC_CANONICAL_SYSTEM
+AM_INIT_AUTOMAKE
+
+AC_SUBST(QPIPE_FEATURES_DEFINES) 
+AC_SUBST(NEWLINE)
+
+AC_PREREQ(2.50)
+AC_PROG_RANLIB
+AC_PROG_CXX
+
+AC_MSG_NOTICE(Configuring QPipe)
+
+# Set here the version numbers
+QPIPE_VERSION_MAJOR=1
+QPIPE_VERSION_MINOR=0
+QPIPE_VERSION_REV=0
+QPIPE_VERSION=$QPIPE_VERSION_MAJOR.$QPIPE_VERSION_MINOR.$QPIPE_VERSION_REV
+
+# make sure I haven't forgotten to run autoconf
+if test configure -ot configure.in; then
+  AC_MSG_RESULT(configure is older than configure.in; running autoconf)
+  autoconf
+  ./configure
+  exit
+fi 
+
+# check for egrep
+AC_PROG_EGREP
+
+# default berkeley db
+# $target is typically processor-vendor-os
+case "$target" in
+  # Sparc Solaris
+  *sparc*sun*)
+    BDB_HOME_DEFAULT="/export/home/ipandis/berkeleydb"
+    ;;
+
+  *ppc*)
+    BDB_HOME_DEFAULT="/usr/software/berkeleydb"
+    ;;
+
+ *)
+    BDB_HOME_DEFAULT="/usr/software/berkeleydb"
+    ;;
+esac
+
+AC_ARG_VAR(BDB_HOME, Location of Berkeley DB Installation; default is $BDB_HOME_DEFAULT)
+
+# debugging diagnostic; set to 'echo' to debug or 'true' for production
+diagnostic() {
+  echo "$@"
+  #true "$@"
+}
+
+# determine if a binary is in the path
+binaryExists() {
+  # on cygwin, 'which' always returns success, so use 'type' instead
+  if type "$1" >/dev/null 2>&1; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# gcc
+if binaryExists g++33; then
+GCC_COMPILER=g++
+else
+    if binaryExists g++; then
+	GCC_COMPILER=g++
+    else
+	AC_MSG_ERROR([
+	 No suitable compiler found. 
+	 Please make sure gcc is in your path.
+	])
+    fi
+fi
+AC_MSG_RESULT(found compiler $GCC_COMPILER)
+
+# gcc version
+AC_MSG_CHECKING($GCC_COMPILER compiler version)
+
+gcc_ver=`$GCC_COMPILER --version | grep 'g++' | sed 's/^.*(GCC) //'`
+gcc_major=`echo $gcc_ver | sed 's/\..*$//'`
+[gcc_mid=`echo $gcc_ver | sed 's/[0-9]\.//' | sed 's/\..*$//'`]
+[gcc_minor=`echo $gcc_ver | sed 's/^[0-9]\.[0-9]\.//' | sed 's/ .*$//'`]
+
+GCC_VERSION="$gcc_major.$gcc_mid.$gcc_minor"
+AC_MSG_RESULT($GCC_VERSION)
+
+reqgcc_major=3
+reqgcc_mid=3
+#if test $gcc_major -ge $reqgcc_major -a $gcc_mid -gt $reqgcc_mid; then
+#    AC_MSG_WARN([GCC Compiler $GCC_COMPILER version $GCC_VERSION is currently not supported by QPipe])
+#fi
+
+
+# this specifies the root of the source tree; it's just the
+# directory where ./configure runs, except on cygwin, which
+# overrides this below
+AC_MSG_CHECKING(home directory)
+QPIPE_HOME=`pwd`
+AC_MSG_RESULT($QPIPE_HOME)
+
+
+# get berkeley db location and version (not implem)
+AC_MSG_CHECKING(BerkeleyDB directory)
+if test -z $BDB_HOME; then
+    BDB_HOME=$BDB_HOME_DEFAULT
+fi
+
+if ! test -d $BDB_HOME -a -f $BDB_HOME/include/db.h; then
+    AC_ERROR([
+	    BerkeleyDB at $BDB_HOME not found; 
+	    Please run ./configure BDB_HOME=where berkeleydb is located])
+
+fi
+
+AC_MSG_RESULT($BDB_HOME)
+
+# berkeleydb version
+AC_MSG_CHECKING(BerkeleyDB version)
+
+bdb_ver=`cat $BDB_HOME/include/db.h | grep 'DB_VERSION_STRING' | sed 's/^.*Berkeley DB //'`
+bdb_major=`echo $bdb_ver | sed 's/\..*$//'`
+[bdb_mid=`echo $bdb_ver | sed 's/[0-9]\.//' | sed 's/\..*$//'`]
+[bdb_minor=`echo $bdb_ver | sed 's/^[0-9]\.[0-9]\.//' | sed 's/:.*$//'`]
+
+BDB_VERSION="$bdb_major.$bdb_mid.$bdb_minor"
+AC_MSG_RESULT($BDB_VERSION)
+
+
+
+# ----------- platform-specific code -------------
+# $target is typically processor-vendor-os
+case "$target" in
+  # linux on x86
+  *86*linux*)
+    AC_MSG_RESULT(configuring for linux/x86)
+
+    ARCHOS=x86_LINUX
+    ;;
+
+  # linux on itanium? (not implem)
+  *IA64*linux*)
+    AC_MSG_RESULT(configuring for linux/ia64)
+
+    ARCHOS=IA64_LINUX
+    ;;
+
+  # linux on power5? (not implem)
+  *ppc*linux*)
+    AC_MSG_RESULT(configuring for linux/power5)
+
+    ARCHOS=PPC_LINUX
+    ;;
+    
+  # Sparc Solaris
+  *sparc*sun*)
+    AC_MSG_RESULT(configuring for sparc/sun)
+    
+    ARCHOS=SPARC_SUN
+    ;;
+
+ *)
+    AC_MSG_ERROR([
+      Unsupported platform $target -- sorry.
+      Linux/x86, Linux/IA64, Linux/PPC
+      currently are supported platforms.
+    ])
+    ;;
+esac
+
+# Create output directory
+if ! test -d "obj/$ARCHOS"; then 
+   mkdir --parents "obj/$ARCHOS"
+   AC_MSG_NOTICE([Creating output directory obj/$ARCHOS])
+fi
+
+
+NEWLINE="\\
+"
+
+# Give a list of features with the defaults
+features="tpcc=yes tpch=yes"                    # workloads
+features="$features tpccgen=yes tpchgen=yes"    # workload generators
+features="$features socket=yes"
+
+
+QPIPE_FEATURES=""
+QPIPE_NOFEATURES=""
+
+
+for f_val in $features
+do
+   f=`echo $f_val | sed -e s%=.*$%%`
+   AC_MSG_CHECKING(whether to use QPipe feature $f)
+   # default value from "features"                                                                                              
+   defval=`echo $f_val | sed -e s%^.*=%%`
+   # current value                                                                                                              
+   getcurval="echo \${with_$f:=$defval}"
+   curval=`eval $getcurval`
+   AC_MSG_RESULT($curval)
+   if test $curval = yes ;then
+      QPIPE_FEATURES="$QPIPE_FEATURES $f"
+   else
+      QPIPE_NOFEATURES="$QPIPE_NOFEATURES $f"
+   fi
+done
+
+
+echo $QPIPE_FEATURES
+
+# At least one architecture must be enabled
+if ! (echo $QPIPE_FEATURES | $EGREP "(tpcc)|(tpch)" >/dev/null); then
+    AC_MSG_ERROR([
+      At least one of the tpcc, tpch workloads must be enabled.
+    ])
+fi
+
+
+## Now produce the QPIPE_FEATURES_DEFINES
+QPIPE_FEATURES_DEFINES=""
+# Convert to upper  case
+[ac_toupper="'[a-z]' '[A-Z]'"]
+for f in `echo $QPIPE_FEATURES | tr $ac_toupper`
+do
+   QPIPE_FEATURES_DEFINES="${QPIPE_FEATURES_DEFINES}@NEWLINE@export USE_$f=yes"
+done
+for f in `echo $QPIPE_NOFEATURES | tr $ac_toupper`
+do
+   QPIPE_FEATURES_DEFINES="${QPIPE_FEATURES_DEFINES}@NEWLINE@export USE_$f="
+done
+
+# ----------------- finish up -------------------
+# names of the variables that get substituted in files; for example,
+# write @ARCHOS@ somewhere in a written file to get it substituted
+AC_SUBST(ARCHOS)
+AC_SUBST(GCC_COMPILER)
+AC_SUBST(QPIPE_HOME)
+AC_SUBST(QPIPE_VERSION_MAJOR)
+AC_SUBST(QPIPE_VERSION_MINOR)
+AC_SUBST(QPIPE_VERSION_REV)
+AC_SUBST(QPIPE_VERSION)
+AC_SUBST(BDB_HOME)
+
+
+# MY_AC_CONFIG_FILES(filename)
+# do AC_CONFIG_FILES(filename, chmod a-w filename)
+define([MY_AC_CONFIG_FILES],
+[{
+  if test -f [$1].in; then
+    AC_CONFIG_FILES([$1], chmod a-w [$1])
+  else
+    true
+    #echo "skipping [$1] because it's not in this distribution"
+  fi
+}])
+define([MY_AC_CONFIG_EXE_FILES],
+[{
+  if test -f [$1].in; then
+    AC_CONFIG_FILES([$1], [chmod a-w,a+x $1])
+  else
+    true
+    #echo "skipping [$1] because it's not in this distribution"
+  fi
+}])
+#MY_AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile])
+
+
+AC_OUTPUT()
+
+AM_CONDITIONAL(SPARC_MACHINE, test "$ARCHOS" = "SPARC_SUN")
+
+# show the user what the variables have been set to
+cat <<EOF
+
+QPipe configuration:
+  QPipe version:            QPIPE_VERSION        $QPIPE_VERSION
+  QPipe home:               QPIPE_HOME           $QPIPE_HOME	
+  GCC compiler              GCC_COMPILER         $GCC_COMPILER
+  GCC version               GCC_VERSION          $GCC_VERSION
+  BerkeleyDB version:	    BDB_VERSION		 $BDB_VERSION
+  BerkeleyDB home:          BDB_HOME             $BDB_HOME
+  Architecture/OS:          ARCHOS               $ARCHOS
+  QPipe features            QPIPE_FEATURES       $QPIPE_FEATURES
+EOF
