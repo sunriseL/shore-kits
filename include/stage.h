@@ -14,6 +14,22 @@ using std::list;
 #define THREAD_POOL_MAX 10
 #define DEFAULT_POOL_THREADS 8
 
+/** Automatically closes an input buffer when it goes out of scope */
+struct buffer_closer_t {
+    tuple_buffer_t *buffer;
+    buffer_closer_t(tuple_buffer_t *buf)
+        : buffer(buf)
+    {
+    }
+
+    ~buffer_closer_t() {
+        buffer->close_buffer();
+    }
+    tuple_buffer_t *operator->() {
+        return buffer;
+    }
+};
+
 /*
  * Class of a basic queue for the stages. In the current implementation it
  * uses the basic_list_t implementation of a list. Uses mutexes and condition
@@ -72,40 +88,29 @@ protected:
     const char* name;
     type_t stage_type;
 
-    // related with the pool of threads
-    int num_pool_threads;
-    thread_t* threadPool[THREAD_POOL_MAX];
-    pthread_mutex_t worker_creator_mutex;
-
-
-    /* simple resource allocation fix */
-    pthread_mutex_t worker_thread_count_mutex;
-    int worker_thread_count;
-
-
 public:
     const char* stage_name() const {return name;}
-    unsigned int thread_pids[THREAD_POOL_MAX];
 
 
     /* basic queue management */
     stage_queue_t* queue;  
     virtual void enqueue(packet_t*)=0;
-    virtual int dequeue()=0;
-
-
-    virtual void init_pool(pthread_t* stage_handles, int n_threads = DEFAULT_POOL_THREADS);
-    virtual void stage_info(char* dest, bool bConstr);
-    virtual void send_stage_constr();
-    virtual void send_stage_destr();
+    int process_next_packet();
 
     stage_t(const char* sname);
     virtual ~stage_t();
 
+protected:
+    virtual int process_packet(packet_t *packet)=0;
+    
+    /** @brief outputs a tuple to any waiting buffers
+     * @return non-zero if output failed (early termination)
+     */
+    int output(packet_t *packet, const tuple_t &tuple);
 
-    int acquire_threads(int n);
-    int release_thread(void);
-    int release_threads(int n);
+    /** @brief cleans up after completing work on a packet
+     */
+    void done(packet_t *packet);
 };
 
 #include "namespace.h"

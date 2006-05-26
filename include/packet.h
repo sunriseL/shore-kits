@@ -5,6 +5,7 @@
 #include "db_cxx.h"
 #include "tuple.h"
 #include "thread.h"
+#include "functors.h"
 
 #include "namespace.h"
 
@@ -20,6 +21,7 @@ public:
     char* packet_string_id;
     int unique_id;
     tuple_buffer_t* output_buffer;
+    tuple_filter_t *filter;
   
     // mutex to protect the list of merged packets
     pthread_mutex_t mutex;
@@ -31,7 +33,9 @@ public:
 
 public:
 
-    packet_t(DbTxn* tid, char* packet_id, tuple_buffer_t* out_buffer);
+    packet_t(DbTxn* tid, char* packet_id,
+             tuple_buffer_t* out_buffer,
+             tuple_filter_t *filt);
 
     virtual ~packet_t();
   

@@ -310,7 +310,7 @@ public:
      * blocks the calling thread if the buffer is empty
      * return NULL if the producer finished producing tuples
      */
-    int get_tuple(tuple_t &tuple);
+    bool get_tuple(tuple_t &tuple);
 
     /* Retrieves a page of tuples from the buffer in one
        operation. The buffer gives up ownership of the page and will
