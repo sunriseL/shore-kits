@@ -1,6 +1,7 @@
 #!/bin/sh
 
 svn log | ./gnuify-changelog.pl > ChangeLog
-aclocal -I m4
+aclocal
 automake
 autoconf
+./configure
