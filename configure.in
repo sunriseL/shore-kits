@@ -161,6 +161,14 @@ case "$target" in
 
     ARCHOS=PPC_LINUX
     ;;
+
+
+  # linux on power5? (not implem)
+  *powerpc64*linux*)
+    AC_MSG_RESULT(configuring for linux/powerpc64)
+
+    ARCHOS=PPC64_LINUX
+    ;;
     
   # Sparc Solaris
   *sparc*sun*)

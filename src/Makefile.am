@@ -6,7 +6,7 @@ AM_CFLAGS = -g3 -O2 -Wall -Wcast-align -Wextra -Wfloat-equal \
 	-Wconversion -Wno-system-headers -D_REENTRANT 
 AM_LDFLAGS = -Wl,$(BDB_HOME)/lib
 LDADD = -lnsl -ldl -lm -lpthread -L$(BDB_HOME)/lib
-INCLUDES = -I@top_srcdir@/include
+INCLUDES = -I@top_srcdir@/include -I$(BDB_HOME)/include
 
 # now specialize
 if SPARC_MACHINE
