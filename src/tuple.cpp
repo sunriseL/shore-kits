@@ -34,10 +34,10 @@ int tuple_buffer_t::wait_for_input() {
     return 0;
 }
 
-int tuple_buffer_t::get_tuple(tuple_t &rec) {
+bool tuple_buffer_t::get_tuple(tuple_t &rec) {
     // make sure there is a valid page
     if(!wait_for_input())
-        return 1;
+        return false;
 
     rec = *read_iterator++;
     if(read_iterator == read_page->end()) {
@@ -45,7 +45,7 @@ int tuple_buffer_t::get_tuple(tuple_t &rec) {
         read_page = NULL;
     }
     
-    return 0;
+    return true;
 }
 
 void tuple_buffer_t::send_eof() {

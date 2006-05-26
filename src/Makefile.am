@@ -1,5 +1,5 @@
 # -*- makefile -*-
-SUBDIRS = trace
+SUBDIRS = trace stages
 
 INCLUDES = -I$(top_srcdir)/include
 
