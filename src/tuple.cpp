@@ -57,7 +57,7 @@ void tuple_buffer_t::send_eof() {
     page_buffer.stop_writing();
 }
 
-void tuple_buffer_t::close_buffer() {
+void tuple_buffer_t::close() {
     free(read_page);
     page_buffer.stop_reading();
 }

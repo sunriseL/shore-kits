@@ -31,6 +31,48 @@ public:
 };
 
 
+packet_t::packet_t(DbTxn* tid, char* packet_id, tuple_buffer_t* out_buffer) :
+    xact_id(tid), packet_string_id(packet_id), output_buffer(out_buffer) {
+
+    // mutex that protects the list of the linked packets for this packet
+    pthread_mutex_init_wrapper(&mutex, NULL);
+    next_packet = NULL;
+    num_merged_packets = 1;
+
+    // receives a unique id for the packet
+    packet_counter * spc = packet_counter::instance();
+    spc->get_next_packet_id(&unique_id);
+
+}
+
+
+packet_t::~packet_t() {
+
+    pthread_mutex_destroy_wrapper(&mutex);
+}
+
+  
+bool packet_t::mergable(packet_t* packet) { 
+    // by default a packet is not mergable
+
+    return false; 
+
+    UNUSED( packet );
+}
+ 
+
+void packet_t::link_packet(packet_t* packet) {
+    
+    pthread_mutex_lock_wrapper(&mutex);
+
+    // prepend new packet
+    packet->next_packet = next_packet;
+    next_packet = packet;
+    num_merged_packets++;
+
+    pthread_mutex_unlock_wrapper(&mutex);
+}
+
 
 packet_counter* packet_counter::spcInstance = NULL;
 
