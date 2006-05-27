@@ -9,12 +9,11 @@
 #
 # $ svn log | /path/to/gnuify-changelog.pl > ChangeLog
 
-%hackers = ( "jpieper"     => 'Josh Pieper <jpieper@ece.cmu.edu>',
-             "abobrek"     => 'Alex Bobrek <abobrek@ece.cmu.edu>',
-	     "jnelson"     => 'Jeff Nelson <jnelson@ece.cmu.edu>',
-	     "jthsieh"     => 'Jon Hsieh <jthsieh@ece.cmu.edu>',
-	     "ryanjohn"    => 'Ryan Johnson <ryanjohn@ece.cmu.edu>',
-	     "bhm"         => 'Brett Meyer <bhm@ece.cmu.edu>');
+%hackers = ( "ryan"      => 'Ryan Johnson <ryanjohn@ece.cmu.edu>',
+	     "ipandis"   => 'Ippokratis Pandis <ipandis@cs.cmu.edu>',
+	     "nhardave"  => 'Nikos Hardavellas <nhardave@andrew.cmu.edu>',
+	     "ddash"     => 'Debabrata Dash <ddash@andrew.cmu.edu>',
+	     "ngm"       => 'Naju Mancheril <naju@cmu.edu>' );
 
 $parse_next_line = 0;
 
