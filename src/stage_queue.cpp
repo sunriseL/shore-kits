@@ -1,188 +1,161 @@
 #include "stage.h"
 #include "packet.h"
+#include "trace/trace.h"
+#include "qpipe_panic.h"
 
+
+// include me last!!!
 #include "namespace.h"
 
-void stage_queue_t::insert(packet_t* packet)
+
+
+
+/**
+ *  @brief Create a new queue with no packets.
+ */
+stage_queue_t::stage_queue_t(const char* sname)
 {
 
-  // Easy. Do a synchronized insert into the queue (append to the
-  // list), update the packet count, and wake at most one thread
-  // waiting on the queue.
+  pthread_mutex_init_wrapper( &queue_mutex, NULL );
+  pthread_cond_init_wrapper ( &queue_packet_available, NULL );
 
-  if (packet == NULL)
-    {
-      TRACE(TRACE_ALWAYS, "NULL packet!\n");
-      return;
-    }
+  new (&packet_list) packet_list_t();
 
-
-
-  // acuire mutex
-  pthread_mutex_lock_wrapper(&queue_mutex);
-
-
-  if ( basic_list_append( packet_list, packet ) ) {
-    fprintf(stderr, "Error: basic_list_append failed\n");
-  }
-
-  num_packets++;
-  if ( pthread_cond_signal_wrapper( &queue_packet_available ) ) {
-    fprintf(stderr, "Error: pthread_cond_signal failed\n");
-  }
-
-  // release mutex
-  pthread_mutex_unlock_wrapper(&queue_mutex);
+  stagename = sname;
 }
 
 
 
 
 /**
- * remove: Remove a packet from the queue
+ *  @brief Destroy this queue of packets. This function currently
+ *  fails if the queue contains any packets.
  */
-
-packet_t* stage_queue_t::remove()
+stage_queue_t::~stage_queue_t(void)
 {
-  // wait for a packet to appear. Then remove it and return.
+  pthread_mutex_destroy_wrapper(&queue_mutex);
+  pthread_cond_destroy_wrapper (&queue_packet_available);
 
-  // wait for a packet
+  TRACE(TRACE_ALWAYS, "stage_queue_t destructor not fully implemented... need to destroy packets and name\n");
+  QPIPE_PANIC();
+}
+
+
+
+
+/**
+ *  @brief Append a new packet to the queue.
+ */
+void stage_queue_t::insert_packet(packet_t* packet)
+{
+
+  // error checking
+  if (packet == NULL)
+  {
+    TRACE(TRACE_ALWAYS, "Trying to insert NULL packet\n");
+    QPIPE_PANIC();
+  }
+  
+  // * * * BEGIN CRITICAL SECTION * * *
   pthread_mutex_lock_wrapper(&queue_mutex);
 
+  packet_list.push_back( packet );
   
-  while ( basic_list_is_empty( packet_list ) ) {
-    if ( pthread_cond_wait_wrapper( &queue_packet_available, &queue_mutex ) ) {
-      fprintf(stderr, "Error: pthread_cond_wait failed\n");
-    }
-  }
+  // signal waiting thread
+  pthread_cond_signal_wrapper( &queue_packet_available );
+  
+  pthread_mutex_unlock_wrapper(&queue_mutex);
+  // * * * END CRITICAL SECTION * * *
+}
 
+
+
+
+/**
+ *  @brief Remove the first packet in the queue.
+ */
+packet_t* stage_queue_t::remove_next_packet(void)
+{
+
+  // * * * BEGIN CRITICAL SECTION * * *
+  pthread_mutex_lock_wrapper(&queue_mutex);
+
+  while ( packet_list.empty() )
+  {
+    pthread_cond_wait_wrapper( &queue_packet_available, &queue_mutex );
+  }
 
   // remove packet
-  packet_t *p;
-  if ( basic_list_remove_head( packet_list, (void**)&p ) ) {
-    fprintf(stderr, "basic_list_remove_head failed on a non-empty list\n");
-  }
-  num_packets--;
-
+  packet_t* p = packet_list.front();
+  packet_list.pop_front();
 
   pthread_mutex_unlock_wrapper(&queue_mutex);
+  // * * * END CRITICAL SECTION * * *
+
   return p;
 }
 
 
-// INTEG: Copied Nikos
-packet_t* stage_queue_t::remove(packet_t* packet)
+
+
+/**
+ *  @brief Remove the specified packet from the queue, if it exists.
+ */
+void stage_queue_t::remove_packet(packet_t* packet)
 {
+  
   if ( packet == NULL )
-    {
-      fprintf(stderr, "Warning: stage_queue_t::remove(packet) called with NULL packet\n");
-      return NULL;
-    }
+  {
+    TRACE(TRACE_ALWAYS, "Called with NULL packet\n");
+    QPIPE_PANIC();
+  }
 
-
-  // Step 1: wait for a packet
+  // * * * BEGIN CRITICAL SECTION * * *
   pthread_mutex_lock_wrapper(&queue_mutex);
 
-  while ( basic_list_is_empty( packet_list ) )
-    {
-      if ( pthread_cond_wait_wrapper( &queue_packet_available, &queue_mutex ) )
-	{
-	  fprintf(stderr, "Error: pthread_cond_wait failed\n");
-	}
-    }
-
-
-
-  // Step 2: Remove the specified packet from the list, if it
-  // exists. Equality is pointer equality.
-  if ( basic_list_remove( packet_list, pointer_equality_comparator, packet, NULL ) )
-    {
-      // packet not found
-      fprintf(stderr, "Warning: stage_queue_t::remove: Packet not found in list\n");
-      pthread_mutex_unlock_wrapper(&queue_mutex);
-      return NULL;
-    }
-  num_packets--;
-
-
+  packet_list.remove(packet);      
 
   pthread_mutex_unlock_wrapper(&queue_mutex);
-  return packet;
-
+  // * * * END CRITICAL SECTION * * *
 }
 
 
-/*
- * try to find a packet to link with. Return the linked packet on
- * success. NULL if one is not found.
- */
 
-packet_t* stage_queue_t::find_and_link_mergable(packet_t* packet)
+
+/**
+ *  @brief Search the queue for packets that can be merged with the
+ *  specified packet. If a mergeable packet P is found, link the
+ *  specifed packet to P and return P. Return NULL if no merge took
+ *  place.
+ */
+packet_t* stage_queue_t::find_and_merge(packet_t* packet)
 {
-  // Does not wait for a packet
 
+  // nothing merged yet
+  packet_t* m = NULL;
+
+
+  // * * * BEGIN CRITICAL SECTION * * *
   pthread_mutex_lock_wrapper(&queue_mutex);
 
-
-  // empty list case
-  if ( basic_list_is_empty( packet_list ) )
+  packet_list_t::iterator it;
+  for (it = packet_list.begin(); it != packet_list.end(); it++)
+  {
+    packet_t* p = *it;
+    if ( p->is_mergable(packet) )
     {
-      pthread_mutex_unlock_wrapper(&queue_mutex);
-      return NULL;
+      p->merge(packet);
+      m = p;
+      break;
     }
+  }
 
-
-  merger_state_t merge_state = { packet, NULL };
-  basic_list_process( packet_list, merge_mapper, &merge_state );
-
-
-
-  // release mutex
   pthread_mutex_unlock_wrapper(&queue_mutex);
+  // * * * END CRITICAL SECTION * * *
 
-  return merge_state.mergable_packet;
+
+  return m;
 }
-
-
-/**
- * Constructor initializes counters, mutexes, and semaphor
- */
-
-stage_queue_t::stage_queue_t(const char* sname) {
-
-  num_packets = 0;
-  packet_list = basic_list_create();
-  stagename = sname;
-
-  if ( packet_list == NULL )
-    {
-      fprintf(stderr, "Error: basic_list_create failed\n");
-    }
-
-  if (pthread_mutex_init_wrapper(&queue_mutex, NULL))
-    {
-      fprintf(stderr, "[stage_queue_t constructor] Error in pthread_mutex_init()\n");
-    }
-
-  if (pthread_cond_init_wrapper(&queue_packet_available,NULL))
-    {
-      fprintf(stderr, "[stage_queue_t constructor] Error in pthread_cond_init()\n");
-    }
-}
-
-
-
-/**
- * Destructor: destroys the mutex and the semaphor
- */ 
-
-stage_queue_t::~stage_queue_t(){
-
-  basic_list_destroy(packet_list);
-  pthread_mutex_destroy_wrapper(&queue_mutex);
-  pthread_cond_destroy_wrapper (&queue_packet_available);
-}
-
 
 
 

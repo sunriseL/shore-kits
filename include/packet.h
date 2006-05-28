@@ -4,46 +4,56 @@
 
 #include "db_cxx.h"
 #include "tuple.h"
-#include "thread.h"
 #include "functors.h"
+#include "qpipe_panic.h"
+
 
 #include "namespace.h"
 
+
 /**
- * class packet_t
- *
- * Class of a stage packet
+ *  @brief A packet in QPIPE is a unit of work that can be processed
+ *  by a stage's worker thread.
  */
-
-class packet_t {
-public:
-    DbTxn* xact_id;
-    char* packet_string_id;
-    int unique_id;
-    tuple_buffer_t* output_buffer;
-    tuple_filter_t *filter;
-  
-    // mutex to protect the list of merged packets
-    pthread_mutex_t mutex;
-    packet_t* next_packet;
-    int num_merged_packets;
-  
-    //    dispatcher_cpu_t bind_cpu;
-
+class packet_t
+{
 
 public:
 
-    packet_t(DbTxn* tid, char* packet_id,
-             tuple_buffer_t* out_buffer,
-             tuple_filter_t *filt);
-
-    virtual ~packet_t();
+  DbTxn* xact_id;
+  char*  packet_id;
+  tuple_buffer_t* output_buffer;
+  tuple_filter_t* filter;
   
-    virtual bool mergable(packet_t* packet) { return false; }
+  // mutex to protect the chain of merged packets
+  pthread_mutex_t merge_mutex;
+  packet_t*       next_merged_packet;
+  int             merge_set_size;
+  
+public:
 
-    virtual void link_packet(packet_t* packet);
+  packet_t(DbTxn* dbt,
+	   char* pack_id,
+	   tuple_buffer_t* outbuf,
+	   tuple_filter_t *filt);
 
-    int get_unique_id() { return (unique_id); }
+  virtual ~packet_t(void);
+
+  /**
+   *  @brief Check whether this packet can be merged with the
+   *  specified one. By default, packets are not mergeable.
+   *
+   *  @return false
+   */  
+  virtual bool is_mergable(packet_t* packet) { packet=packet; return false; }
+
+  virtual void merge(packet_t* packet);
+
+  /**
+   *  @brief Packet ID accessor.
+   */
+  char* get_packet_id(void) { return packet_id; }
+
 };
 
 #include "namespace.h"
