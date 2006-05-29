@@ -36,7 +36,7 @@ int tuple_buffer_t::wait_for_input() {
 
 bool tuple_buffer_t::get_tuple(tuple_t &rec) {
     // make sure there is a valid page
-    if(!wait_for_input())
+    if(wait_for_input())
         return false;
 
     rec = *read_iterator++;
@@ -49,10 +49,10 @@ bool tuple_buffer_t::get_tuple(tuple_t &rec) {
 }
 
 void tuple_buffer_t::send_eof() {
-    if(write_page->empty()) 
-        free(write_page);
-    else
+    if(!write_page->empty()) {
         page_buffer.write(write_page);
+        write_page = NULL;
+    }
 
     page_buffer.stop_writing();
 }
@@ -68,7 +68,7 @@ void tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
     tuple_size = _tuple_size;
     page_size = _page_size;
     read_page = NULL;
-    write_page = tuple_page_t::alloc(_tuple_size, malloc, sizeof(tuple_page_t));
+    write_page = tuple_page_t::alloc(_tuple_size, malloc);
     pthread_mutex_init_wrapper(&init_lock, NULL);
     pthread_cond_init_wrapper(&init_notify, NULL);
 }

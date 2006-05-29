@@ -28,6 +28,7 @@ void *write_tuples(void *arg) {
         }
     }
 
+    buffer->send_eof();
     return NULL;
 }
 
@@ -46,7 +47,7 @@ protected:
     virtual bool filter(tuple_t &, const tuple_t &) {
         // ignore group breaks for now
         count++;
-        return true;
+        return false;
     }
 };
 

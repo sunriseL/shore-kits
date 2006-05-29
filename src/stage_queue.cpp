@@ -19,7 +19,7 @@ stage_queue_t::stage_queue_t(const char* sname)
   pthread_mutex_init_wrapper( &queue_mutex, NULL );
   pthread_cond_init_wrapper ( &queue_packet_available, NULL );
 
-  new (&packet_list) packet_list_t();
+  //  new (&packet_list) packet_list_t();
 
   stagename = sname;
 }

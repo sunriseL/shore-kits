@@ -279,6 +279,9 @@ public:
      * return 1 if the buffer is closed by consumer
      */
     int put_tuple (const tuple_t &tuple) {
+        if(check_page_full())
+            return 1;
+
         return !write_page->append_init(tuple);
     }
 
@@ -303,6 +306,9 @@ public:
        return 1 if the buffer has been closed
     */
     int alloc_tuple(tuple_t &tuple) {
+        if(check_page_full())
+            return 1;
+
         return !write_page->append_mount(tuple);
     };
   
