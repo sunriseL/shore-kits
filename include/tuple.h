@@ -333,7 +333,7 @@ public:
     /* closes an input_buffer
      * following invocations of put_tuple will return 1
      */
-    void close_buffer();
+    void close();
 
     /* Signals the consumer that there will be no more inputs.
      */
@@ -354,7 +354,7 @@ public:
      * 0 indicates a success, negative value indicates parent terminated us
      * positive value indicates that waiting_init would block and we should try calling later
      */
-    int wait_init(bool block = true);
+    int wait_init(bool block=true);
 
     /* send a message to the monitor only if the change is over 10% of the last
      * transmitted change. the last transmitted value is stored in the lastTransmit

@@ -33,7 +33,12 @@ stage_t::~stage_t()
     delete queue;
 }
 
+void stage_t::enqueue(packet_t *packet) {
+    queue->insert_packet(packet);
+}
 
+#ifdef CHANGE_MIND
+// not implemented for now
 bool stage_t::is_mergeable(packet_t *packet) {
     bool result;
     pthread_mutex_lock_wrapper(&stage_lock);
@@ -41,6 +46,7 @@ bool stage_t::is_mergeable(packet_t *packet) {
     pthread_mutex_unlock_wrapper(&stage_lock);
     return result;
 }
+#endif
 
 int stage_t::output(packet_t *packet, const tuple_t &tuple) {
     // send the tuple to the output buffer
@@ -71,7 +77,7 @@ struct scope_delete_t {
 
 int stage_t::process_next_packet() {
     // block until a new packet becomes available
-    scope_delete_t<packet_t> packet = queue->remove();
+    scope_delete_t<packet_t> packet = queue->remove_next_packet();
     if(packet == NULL) {
         TRACE(TRACE_ALWAYS, "Null packet arrive at stage %s!", name);
         return 1;
@@ -82,8 +88,10 @@ int stage_t::process_next_packet() {
     // wait for a green light from the parent
     // TODO: what about the parents of merged packets?
     if(packet->output_buffer->wait_init()) {
+#ifdef MERGING_ADDED
         // make sure nobody else tries to merge
         not_mergeable(packet);
+#endif
 
         // TODO: check if we have any merged packets before closing
         // the input buffer
@@ -101,51 +109,5 @@ int stage_t::process_next_packet() {
     packet->output_buffer->send_eof();
     return 0;
 }
-
-#if 0
-/**
- * init_pool(int n_threads): Creates the pool of threads.
- */
-
-void stage_t::init_pool(pthread_t* stage_handles, int n_threads)
-{
-
-    /* check the requested size of the thread pool */
-    if (n_threads > THREAD_POOL_MAX) {
-        TRACE_ERROR("Stage: %s. Initializing worker_thread pool. Cannot have more that %d threads in the pool.\n", name, THREAD_POOL_MAX);
-        n_threads = THREAD_POOL_MAX;
-    }
-
-    num_pool_threads = n_threads;
-
-    worker_thread_count = num_pool_threads;
-
-
-    for (int i = 0; i < num_pool_threads; i++) {
-    
-        // acquire lock before creating worker_thread
-        pthread_mutex_lock_wrapper(&worker_creator_mutex);
-
-        threadPool[i] = new worker_thread_t(this, i);
-        thread_pids[i] = 0;
-
-        // NIKOS
-        // pthread_t     thread;
-        // pthread_create(&thread, NULL, start_thread, (void*)threadPool[i]);
-
-        pthread_attr_t pattr;
-        pthread_attr_init( &pattr );
-        pthread_attr_setscope( &pattr, PTHREAD_SCOPE_SYSTEM );
-        pthread_create(&stage_handles[i], &pattr, start_thread, (void*)threadPool[i]);
-
-        // release lock
-        pthread_mutex_unlock_wrapper(&worker_creator_mutex);
-    }
-
-    // sleep for a while to give some time to the worker threads to be initialized
-    sleep(1);
-    MON_STAGE_CONSTR();
-}
-#endif
 
 #include "namespace.h"

@@ -11,23 +11,12 @@
 
 class tuple_filter_t {
 public:
-    bool filter(tuple_t &dest, const tuple_t &src) {
-        if(!select(src))
-            return false;
-        
-        project(dest, src);
+    virtual bool filter(tuple_t &dest, const tuple_t &src) {
+        dest.assign(src);
         return true;
     }
     virtual ~tuple_filter_t() { }
     
-protected:
-    virtual void project(tuple_t &dest, const tuple_t &src) {
-        dest.assign(src);
-    }
-
-    virtual bool select(const tuple_t &src) {
-        return true;
-    }
 };
 
 class tuple_join_t {

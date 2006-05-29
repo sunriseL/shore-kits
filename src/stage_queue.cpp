@@ -1,7 +1,7 @@
 #include "stage.h"
 #include "packet.h"
 #include "trace/trace.h"
-#include "qpipe_panic.h"
+//#include "qpipe_panic.h"
 
 
 // include me last!!!
@@ -37,7 +37,7 @@ stage_queue_t::~stage_queue_t(void)
   pthread_cond_destroy_wrapper (&queue_packet_available);
 
   TRACE(TRACE_ALWAYS, "stage_queue_t destructor not fully implemented... need to destroy packets and name\n");
-  QPIPE_PANIC();
+  //  QPIPE_PANIC();
 }
 
 
@@ -53,7 +53,7 @@ void stage_queue_t::insert_packet(packet_t* packet)
   if (packet == NULL)
   {
     TRACE(TRACE_ALWAYS, "Trying to insert NULL packet\n");
-    QPIPE_PANIC();
+    //    QPIPE_PANIC();
   }
   
   // * * * BEGIN CRITICAL SECTION * * *
@@ -107,7 +107,7 @@ void stage_queue_t::remove_packet(packet_t* packet)
   if ( packet == NULL )
   {
     TRACE(TRACE_ALWAYS, "Called with NULL packet\n");
-    QPIPE_PANIC();
+    //    QPIPE_PANIC();
   }
 
   // * * * BEGIN CRITICAL SECTION * * *
@@ -139,10 +139,10 @@ packet_t* stage_queue_t::find_and_merge(packet_t* packet)
   pthread_mutex_lock_wrapper(&queue_mutex);
 
   packet_list_t::iterator it;
-  for (it = packet_list.begin(); it != packet_list.end(); it++)
+  for (it = packet_list.begin(); it != packet_list.end(); ++it)
   {
     packet_t* p = *it;
-    if ( p->is_mergable(packet) )
+    if ( p->is_mergeable(packet) )
     {
       p->merge(packet);
       m = p;

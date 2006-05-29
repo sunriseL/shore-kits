@@ -1,3 +1,3 @@
 # -*- makefile -*-
 
-SUBDIRS = src
+SUBDIRS = src tests

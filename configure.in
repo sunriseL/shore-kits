@@ -263,20 +263,16 @@ AC_SUBST(QPIPE_VERSION)
 AC_SUBST(BDB_HOME)
 
 # basic flags/libs every arch needs
-CXXFLAGS="-g3 -O3 -Wall -Wcast-align -Wextra -Wfloat-equal \
+CXXFLAGS="-g -Wall -Wcast-align -Wextra -Wfloat-equal \
 	-Wconversion -Wno-system-headers -D_REENTRANT"
-LDADD="-lnsl -ldl -lm -lpthread -L$BDB_HOME/lib"
-LDFLAGS="-Wl,$BDB_HOME/lib"
+LDFLAGS="-lnsl -ldl -lm -lpthread -ldb_cxx -L$BDB_HOME/lib"
 if test "$ARCHOS" = "SPARC_SUN"; then
-    LDADD="$LDADD -lsocket -lrt"
-    LDFLAGS="$LDFLAGS -Wl,-R"
+    LDFLAGS="$LDFLAGS -lsocket -lrt"
 else
-    LDADD="$LDADD -lboost_regex"
-    LDFLAGS="$LDFLAGS -Wl,--rpath"
+    LDFLAGS="$LDFLAGS -lboost_regex"
 fi
 
 AC_SUBST(CXXFLAGS)
-AC_SUBST(LDADD)
 AC_SUBST(LDFLAGS)
     
 
@@ -301,8 +297,7 @@ define([MY_AC_CONFIG_EXE_FILES],
   fi
 }])
 #MY_AC_CONFIG_FILES([Makefile src/Makefile])
-AC_CONFIG_FILES([Makefile src/Makefile src/trace/Makefile \
-    src/stages/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile])
 
 
 AC_OUTPUT()

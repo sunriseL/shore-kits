@@ -32,7 +32,7 @@ struct buffer_closer_t
   }
   
   ~buffer_closer_t() {
-    buffer->close_buffer();
+    buffer->close();
   }
 
   tuple_buffer_t *operator->() {
@@ -102,10 +102,13 @@ protected:
   type_t stage_type;
   stage_queue_t* queue;
 
+    // used to synchronize shared state when necessary
+    pthread_mutex_t stage_lock;
+
 public:
 
   stage_t(const char* sname);
-  virtual ~stage_t();
+    virtual ~stage_t();
 
 
   /**
@@ -114,7 +117,7 @@ public:
   const char* get_name() const { return name; }
 
   /* The dispatcher can use this method to send work to this stage. */
-  virtual void enqueue(packet_t*)=0;
+  void enqueue(packet_t*);
 
   /* A worker thread for this stage should loop around this
      function. */

@@ -5,10 +5,10 @@
  *
  *  @bug None known.
  */
-#include "trace_stream.h"        /* for prototypes */
+#include "trace/trace_stream.h"        /* for prototypes */
 #include <pthread.h>             /* for pthread_mutex_t */
-#include "trace_force.h"         /* for TRACE_FORCE() */
-#include "trace_print_pthread.h" /* for trace_print_pthread() */
+#include "trace/trace_force.h"         /* for TRACE_FORCE() */
+#include "trace/trace_print_pthread.h" /* for trace_print_pthread() */
 
 
 

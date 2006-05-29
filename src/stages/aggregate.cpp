@@ -25,8 +25,10 @@ int aggregate_stage_t::process_packet(packet_t *p) {
     // process normal groups
     while(input->get_tuple(src)) {
         if(aggregate->filter(dest, src)) {
+#ifdef BUG_FIXED
             // update mergeable status
             not_mergeable(packet);
+#endif
 
             // output the tuple
             if(output(packet, dest)) 

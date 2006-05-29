@@ -7,7 +7,7 @@
  *
  *  @bug None known.
  */
-#include "trace_force.h" /* for prototypes */
+#include "trace/trace_force.h" /* for prototypes */
 
 #include <cstdarg>      /* for va_list */
 #include <cstdio>       /* for stdout, stderr */

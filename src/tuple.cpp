@@ -67,6 +67,20 @@ void tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
     initialized = false;
     tuple_size = _tuple_size;
     page_size = _page_size;
+    read_page = NULL;
+    write_page = tuple_page_t::alloc(_tuple_size, malloc, sizeof(tuple_page_t));
+    pthread_mutex_init_wrapper(&init_lock, NULL);
+    pthread_cond_init_wrapper(&init_notify, NULL);
+}
+
+tuple_buffer_t::~tuple_buffer_t() {
+    pthread_mutex_destroy_wrapper(&init_lock);
+    pthread_cond_destroy_wrapper(&init_notify);
+    if(read_page)
+        free(read_page);
+    if(write_page)
+        free(write_page);
+        
 }
 
 /**
@@ -81,6 +95,24 @@ void tuple_buffer_t::init_buffer() {
     initialized = true;
     pthread_cond_signal_wrapper(&init_notify);
     
+    pthread_mutex_unlock_wrapper(&init_lock);
+}
+
+/**
+ * @brief waits for the buffer's output stage to unlock the buffer
+ */
+int tuple_buffer_t::wait_init(bool block) {
+    pthread_mutex_unlock_wrapper(&init_lock);
+
+    if(block) {
+        while(!initialized && !page_buffer.stopped_reading())
+            pthread_cond_wait_wrapper(&init_notify, &init_lock);
+
+        return page_buffer.stopped_reading()? -1 : 0;
+    }
+
+    return initialized? 0 : 1;
+
     pthread_mutex_unlock_wrapper(&init_lock);
 }
 

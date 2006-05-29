@@ -10,11 +10,11 @@
  *
  *  @bug None known.
  */
-#include "trace.h"        /* for prototypes */
+#include "trace/trace.h"        /* for prototypes */
 #include <cstdio>        /* for stdout, stderr */
 #include <cstring>       /* for strlen() */
-#include "trace_stream.h" /* for trace_stream() */
-#include "trace_force.h"  /* for TRACE_FORCE() */
+#include "trace/trace_stream.h" /* for trace_stream() */
+#include "trace/trace_force.h"  /* for TRACE_FORCE() */
 
 
 

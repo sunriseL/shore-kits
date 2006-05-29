@@ -17,12 +17,14 @@
 packet_t::packet_t(DbTxn* tid,
 		   char* pack_id,
 		   tuple_buffer_t* outbuf,
-		   tuple_filter_t* filt)
+		   tuple_filter_t* filt,
+                   bool mergeable)
 {
   xact_id = tid;
   packet_id = pack_id;
   output_buffer = outbuf;
   filter = filt;
+  this->mergeable = mergeable;
 
   pthread_mutex_init_wrapper( &merge_mutex, NULL );
   next_merged_packet = NULL;
@@ -44,7 +46,7 @@ packet_t::~packet_t(void)
   pthread_mutex_destroy_wrapper(&merge_mutex);
 
   TRACE(TRACE_ALWAYS, "packet_t destructor not fully implemented... need to destroy packet ID\n");
-  QPIPE_PANIC();
+  //  QPIPE_PANIC();
 }
 
 

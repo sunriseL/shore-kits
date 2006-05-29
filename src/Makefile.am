@@ -1,13 +1,15 @@
 # -*- makefile -*-
-SUBDIRS = trace stages tests
-
 INCLUDES = -I$(top_srcdir)/include
+
+STAGES = stages/aggregate.cpp
+TRACE = trace/trace.cpp trace/trace_force.cpp \
+	trace/trace_print_pthread.cpp trace/trace_stream.cpp
 
 # encapsulates all basic classes needed in qpipe
 lib_LIBRARIES = libqpipe.a
 
-libqpipe_a_SOURCES = thread.cpp page.cpp tuple.cpp packet.cpp stage_queue.cpp stage.cpp
-libqpipe_a_LIBADD = trace/libtrace.a
+libqpipe_a_SOURCES = thread.cpp page.cpp tuple.cpp packet.cpp \
+	stage_queue.cpp stage.cpp $(STAGES) $(TRACE)
 
 # define programs here
 #bin_PROGRAMS = test_hash_join_stage

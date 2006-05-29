@@ -7,7 +7,7 @@
  *
  *  @bug None known.
  */
-#include "trace_print_pthread.h" /* for prototypes */
+#include "trace/trace_print_pthread.h" /* for prototypes */
 
 
 
