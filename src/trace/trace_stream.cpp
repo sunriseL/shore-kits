@@ -5,10 +5,15 @@
  *
  *  @bug None known.
  */
+#include "thread.h"                    /* for pthread_mutex_t */
 #include "trace/trace_stream.h"        /* for prototypes */
-#include <pthread.h>             /* for pthread_mutex_t */
 #include "trace/trace_force.h"         /* for TRACE_FORCE() */
 #include "trace/trace_print_pthread.h" /* for trace_print_pthread() */
+
+
+
+
+using namespace qpipe;
 
 
 
@@ -60,6 +65,8 @@ void trace_stream(FILE* out_stream,
      atomically, there is no such guarantee across multiple calls. We
      use a mutex to synchronize access to the console.
   */
+  const char* thread_name = thread_get_self_name();
+  
 
   if ( pthread_mutex_lock( &stream_mutex ) )
   {
@@ -67,7 +74,15 @@ void trace_stream(FILE* out_stream,
     return;
   }
 
-  trace_print_pthread(out_stream, pthread_self());
+
+  /* Try to print a meaningful (string) thread ID. If no ID is
+     registered, just use pthread_t returned by pthread_self(). */
+  if ( thread_name != NULL )
+    fprintf(out_stream, "%s", thread_name);
+  else
+    trace_print_pthread(out_stream, pthread_self());
+
+
   fprintf(out_stream, ": %s:%d:%s: ", filename, line_num, function_name);
   vfprintf(out_stream, format, ap);
   
