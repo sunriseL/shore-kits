@@ -1,7 +1,7 @@
 
 #include "trace/trace.h"
 
-int main(int argc, char* argv[])
+int main(int, char**)
 {
   
   TRACE(TRACE_ALWAYS, "hello world\n");
