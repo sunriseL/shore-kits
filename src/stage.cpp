@@ -1,22 +1,30 @@
+
 #include "stage.h"
 #include "trace/trace.h"
+#include "qpipe_panic.h"
 
+
+
+// include me last!!!
 #include "namespace.h"
 
+
+
 /*
- * Constructor: Creates the main queue of the stage, and initiates the
- * mutex that protects the creation of the worker threads.
+ * Stage constructor.
+ *
+ * @param sname The name of this stage.
  */
-
-stage_t::stage_t(const char* sname) : name(sname)
+stage_t::stage_t(const char* sname)
 {
-    /* main queue of the stage */
-    queue = new stage_queue_t(name);
+  
+  name = sname;
+  
+  // main queue of the stage
+  queue = new stage_queue_t(this);
 
-    /* mutex that serializes the creation of the worker threads */
-    if (pthread_mutex_init_wrapper(&stage_lock, NULL)) {
-        TRACE(TRACE_ALWAYS, "Error in creating stage_lock. Stage=%d\n", name);
-    }
+  // mutex that serializes the creation of the worker threads
+  pthread_mutex_init_wrapper(&queue_lock, NULL);
 }
 
 
@@ -26,32 +34,28 @@ stage_t::stage_t(const char* sname) : name(sname)
  * deleted inside the start_thread() function.
  */
 
-stage_t::~stage_t()
+stage_t::~stage_t(void)
 {
-
-    /* The threadPool[i] threads are deleted inside the start_thread() function */
-    delete queue;
+  // There should be no worker threads accessing the packet queue when
+  // this function is called. Otherwise, we get race conditions and
+  // invalid memory accesses.
+  delete queue;
+  
+  pthread_mutex_destroy_wrapper(&queue_lock);
 }
 
-void stage_t::enqueue(packet_t *packet) {
-    queue->insert_packet(packet);
+void stage_t::enqueue(packet_t *packet)
+{
+  queue->enqueue(packet);
 }
 
-#ifdef CHANGE_MIND
-// not implemented for now
-bool stage_t::is_mergeable(packet_t *packet) {
-    bool result;
-    pthread_mutex_lock_wrapper(&stage_lock);
-    result = packet->mergeable;
-    pthread_mutex_unlock_wrapper(&stage_lock);
-    return result;
-}
-#endif
 
-int stage_t::output(packet_t *packet, const tuple_t &tuple) {
-    // send the tuple to the output buffer
-    return packet->output_buffer->put_tuple(tuple);
+int stage_t::output(packet_t* packet, const tuple_t &tuple)
+{
+  // send the tuple to the output buffer
+  return packet->output_buffer->put_tuple(tuple);
 }
+
 
 /** Automatically deletes a pointer when 'this' goes out of scope */
 template <typename T>
@@ -75,39 +79,46 @@ struct scope_delete_t {
     }
 };
 
-int stage_t::process_next_packet() {
-    // block until a new packet becomes available
-    scope_delete_t<packet_t> packet = queue->remove_next_packet();
-    if(packet == NULL) {
-        TRACE(TRACE_ALWAYS, "Null packet arrive at stage %s!", name);
-        return 1;
-    }
 
-    // TODO: process rebinding instructions here
 
-    // wait for a green light from the parent
-    // TODO: what about the parents of merged packets?
-    if(packet->output_buffer->wait_init()) {
+int stage_t::process_next_packet(void)
+{
+
+  // block until a new packet becomes available
+  scope_delete_t<packet_t> packet = queue->dequeue();
+  if(packet == NULL)
+  {
+    TRACE(TRACE_ALWAYS, "Removed NULL packet in stage %s!", name);
+    QPIPE_PANIC();
+  }
+  
+  
+  // TODO: process rebinding instructions here
+  
+  // wait for a green light from the parent
+  // TODO: what about the parents of merged packets?
+  if(packet->output_buffer->wait_init()) {
 #ifdef MERGING_ADDED
-        // make sure nobody else tries to merge
-        not_mergeable(packet);
+    // make sure nobody else tries to merge
+    not_mergeable(packet);
 #endif
 
-        // TODO: check if we have any merged packets before closing
-        // the input buffer
-        return 1;
-    }
 
-    // process the packet
-    int early_termination = process_packet(packet);
-    if(early_termination) {
-        // TODO: something special?
-    }
+    // TODO: check if we have any merged packets before closing
+    // the input buffer
+    return 1;
+  }
 
-    // close the output buffer
-    // TODO: also close merged packets' output buffers
-    packet->output_buffer->send_eof();
-    return 0;
+  // perform stage-specified processing
+  int early_termination = process_packet(packet);
+  if(early_termination) {
+    // TODO: something special?
+  }
+
+  // close the output buffer
+  // TODO: also close merged packets' output buffers
+  packet->output_buffer->send_eof();
+  return 0;
 }
 
 #include "namespace.h"
