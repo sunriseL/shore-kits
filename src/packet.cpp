@@ -27,7 +27,7 @@ packet_t::packet_t(DbTxn* tid,
   this->mergeable = mergeable;
 
   pthread_mutex_init_wrapper( &merge_mutex, NULL );
-  next_merged_packet = NULL;
+  next_merged_packet = this;;
   merge_set_size = 1;
   
   TRACE(TRACE_PACKET_FLOW, "Created a new packet with ID %s\n", packet_id);

@@ -43,8 +43,8 @@ int fscan_stage_t::process_packet(packet_t *p) {
     // initialize data buffer for bulk reading. Must be aligned for
     // int accesses and a multiple of 1024 bytes long.
     // TODO: use actual pages somehow
-    int bufsize = 4096/sizeof(int);
-    int buffer[bufsize];
+    int bufsize = 10*4096/sizeof(int);
+    int buffer = new int[bufsize];
     Dbt bulk_key, bulk_data;
     memset(&bulk_key, 0, sizeof(bulk_key));
     memset(&bulk_data, 0, sizeof(bulk_data));
