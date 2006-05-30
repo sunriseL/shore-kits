@@ -92,12 +92,13 @@ int stage_t::process_next_packet(void)
     QPIPE_PANIC();
   }
   
-  
+
   // TODO: process rebinding instructions here
   
   // wait for a green light from the parent
   // TODO: what about the parents of merged packets?
-  if(packet->output_buffer->wait_init()) {
+  if( packet->output_buffer->wait_init() )
+  {
 #ifdef MERGING_ADDED
     // make sure nobody else tries to merge
     not_mergeable(packet);
