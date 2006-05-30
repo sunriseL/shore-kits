@@ -54,7 +54,6 @@ int fscan_stage_t::process_packet(packet_t *p) {
 
     // make sure we don't forget to close the cursor
     init_cleanup_t<cursor_close_t> guard(dbcp);
-    
     while(1) {
         // request a group of tuples
         int tmp_ret = dbcp->get(&bulk_key, &bulk_data,

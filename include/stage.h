@@ -5,12 +5,10 @@
 #include "thread.h"
 #include "tuple.h"
 #include "packet.h"
-#include <list>
 
 
 // include me last!!!
 #include "namespace.h"
-using std::list;
 
 
 
@@ -52,8 +50,6 @@ struct buffer_closer_t {
 class stage_queue_t {
 
 private:
-
-    typedef list<packet_t*> packet_list_t;
   
     stage_t* parent_stage;
 
@@ -104,11 +100,11 @@ protected:
     const char* name;
 
     // packet queue
-    stage_queue_t*  queue;
+    stage_queue_t  queue;
     pthread_mutex_t queue_lock;
 
     // side queue
-    stage_queue_t* side_queue;
+    packet_list_t side_queue;
   
 public:
 

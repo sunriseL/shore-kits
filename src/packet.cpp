@@ -27,8 +27,7 @@ packet_t::packet_t(DbTxn* tid,
   this->mergeable = mergeable;
 
   pthread_mutex_init_wrapper( &merge_mutex, NULL );
-  next_merged_packet = this;;
-  merge_set_size = 1;
+  merged_packets.push_front(this);
   
   TRACE(TRACE_PACKET_FLOW, "Created a new packet with ID %s\n", packet_id);
 }
@@ -65,9 +64,7 @@ void packet_t::merge(packet_t* packet)
   
   // add packet to head of merge set
 
-  packet->next_merged_packet = next_merged_packet;
-  next_merged_packet = packet;
-  merge_set_size++;
+  merged_packets.push_front(packet);
   
   pthread_mutex_unlock_wrapper(&merge_mutex);
 }
