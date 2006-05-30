@@ -8,7 +8,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>
+#include <cassert>
 
+#include "utils.h"
 
 
 // include me last!!!
@@ -60,6 +62,27 @@ void pthread_cond_destroy_wrapper(pthread_cond_t* cond);
 void pthread_cond_signal_wrapper (pthread_cond_t* cond);
 void pthread_cond_wait_wrapper   (pthread_cond_t* cond,
 				  pthread_mutex_t* mutex);
+
+
+/**
+ * @brief A critical section manager.
+ *
+ * Locks and unlocks the specified mutex upon construction and
+ * following call to 'exit', respectively. Also verifies that the
+ * mutex is unlocked exactly once during this object's lifetime.
+ */
+struct critical_section_state_t {
+    typedef pthread_mutex_t *Param;
+    Param _mutex;
+    critical_section_state_t(Param mutex)
+        : _mutex(mutex)
+    {
+    }
+    void init() { pthread_mutex_lock_wrapper(_mutex); }
+    void cleanup() { pthread_mutex_unlock_wrapper(_mutex); }
+};
+
+typedef init_cleanup_t<critical_section_state_t> critical_section_t;
 
 
 #include "namespace.h"

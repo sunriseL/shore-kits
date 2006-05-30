@@ -79,6 +79,9 @@ int main() {
 
     pthread_t stage_thread;
     pthread_t source_thread;
+    pthread_mutex_t mutex;
+
+    pthread_mutex_init_wrapper(&mutex, NULL);
     
     pthread_create(&stage_thread, NULL, &drive_stage, stage);
 
@@ -106,5 +109,6 @@ int main() {
     while(output_buffer.get_tuple(output))
         printf("Count: %d\n", *(int*)output.data);
 
+    pthread_mutex_destroy_wrapper(&mutex);
     return 0;
 }

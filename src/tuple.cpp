@@ -89,31 +89,26 @@ tuple_buffer_t::~tuple_buffer_t() {
  */
 
 void tuple_buffer_t::init_buffer() {
-    // unblock waiting producer
-    pthread_mutex_lock_wrapper(&init_lock);
+    critical_section_t cs(&init_lock);
     
+    // unblock waiting producer
     initialized = true;
     pthread_cond_signal_wrapper(&init_notify);
-    
-    pthread_mutex_unlock_wrapper(&init_lock);
+    cs.exit();
 }
 
 /**
  * @brief waits for the buffer's output stage to unlock the buffer
  */
 int tuple_buffer_t::wait_init(bool block) {
-    pthread_mutex_unlock_wrapper(&init_lock);
+    critical_section_t cs(&init_lock);
 
-    if(block) {
-        while(!initialized && !page_buffer.stopped_reading())
-            pthread_cond_wait_wrapper(&init_notify, &init_lock);
+    if(!block) 
+        return cs.exit(initialized? 0 : 1);
+    while(!initialized && !page_buffer.stopped_reading())
+        pthread_cond_wait_wrapper(&init_notify, &init_lock);
 
-        return page_buffer.stopped_reading()? -1 : 0;
-    }
-
-    return initialized? 0 : 1;
-
-    pthread_mutex_unlock_wrapper(&init_lock);
+    return cs.exit(page_buffer.stopped_reading()? -1 : 0);
 }
 
 

@@ -28,7 +28,7 @@ struct aggregate_packet_t : public packet_t {
     {
     }
 
-    void terminate();
+    virtual void terminate();
 };
 
 /**
