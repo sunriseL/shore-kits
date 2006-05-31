@@ -15,7 +15,6 @@
 
 
 
-
 /* exported functions */
 
 void trace_(int trace_type,
@@ -24,11 +23,9 @@ void trace_(int trace_type,
 
 
 
-
 /* exported data structures */
 
 extern uint32_t trace_current_setting;
-
 
 
 
@@ -58,7 +55,6 @@ extern uint32_t trace_current_setting;
  */
 
 #define TRACE(type, format, rest...) trace_(type, __FILE__, __LINE__, __FUNCTION__, format, ##rest)
-
 
 
 

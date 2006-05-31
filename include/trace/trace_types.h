@@ -1,3 +1,4 @@
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 /** @file trace_types.h
  *
@@ -25,6 +26,7 @@
 #define TRACE_THREAD_LIFE_CYCLE  (1 << 5)
 
 #define TRACE_DEBUG              (1 << 31)
+
 
 
 #endif

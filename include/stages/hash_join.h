@@ -1,4 +1,4 @@
-/* -*- mode: C++ -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 /* hash_join_stage.h */
 /* Declaration of the hash_join_stage hash_join_packet classes */

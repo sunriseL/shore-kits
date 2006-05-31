@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef _page_h
 #define _page_h
 

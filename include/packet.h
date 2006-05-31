@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 #ifndef __PACKET_H
 #define __PACKET_H
@@ -9,11 +9,15 @@
 #include <list>
 
 
+
+// include me last!!!
 #include "namespace.h"
 
 using std::list;
 class packet_t;
 typedef list<packet_t*> packet_list_t;
+
+
 
 /**
  *  @brief A packet in QPIPE is a unit of work that can be processed
@@ -28,6 +32,7 @@ typedef list<packet_t*> packet_list_t;
  *  queue, it will check the working set to see if the new packet can
  *  be merged with an existing one that is already being processed.
  */
+
 class packet_t
 {
 
@@ -50,18 +55,20 @@ public:
 
 public:
 
-    virtual ~packet_t(void);
-
     packet_t::packet_t(DbTxn* tid,
                        char* pack_id,
                        tuple_buffer_t* outbuf,
                        tuple_filter_t* filt,
                        bool mergeable=false);
+    virtual ~packet_t(void);
+
 
     /**
      *  @brief Packet ID accessor.
      */
+
     char* get_packet_id(void) { return packet_id; }
+
 
     /**
      *  @brief Check whether this packet can be merged with the
@@ -69,12 +76,14 @@ public:
      *
      *  @return false
      */  
+
     virtual bool is_mergeable(packet_t *) { return false; }
 
 
     /**
      *  @brief Merge the specified packet with this one.
      */
+
     virtual void merge(packet_t* packet);
 
 
@@ -83,8 +92,11 @@ public:
      * should cascade the termination to its children, if any, by
      * closing its input buffers.
      */
+
     virtual void terminate()=0;
 };
+
+
 
 #include "namespace.h"
 #endif

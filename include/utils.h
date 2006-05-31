@@ -1,4 +1,5 @@
 /* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef __UTILS_H
 #define __UTILS_H
 
@@ -13,6 +14,7 @@
  *  @brief A helper class that automatically deletes a pointer when
  *  'this' goes out of scope.
  */
+
 template <typename T>
 struct scope_delete_t {
     T *ptr;
@@ -37,21 +39,22 @@ struct scope_delete_t {
 
 
 /**
- * @brief A helper class for operations involving setup and takedown
- * phases that must be matched (ie mutex lock/unlock, malloc/free,
- * etc).
+ *  @brief A helper class for operations involving setup and takedown
+ *  phases that must be matched (ie mutex lock/unlock, malloc/free,
+ *  etc).
  *
- * This class performs "initialization" when constructed, and asserts
- * that "cleanup" has been performed before it goes out of scope
- * (usually by returning from a function call). Cleanup must be
- * performed exactly once by calling one of the "exit" functions.
+ *  This class performs "initialization" when constructed, and asserts
+ *  that "cleanup" has been performed before it goes out of scope
+ *  (usually by returning from a function call). Cleanup must be
+ *  performed exactly once by calling one of the "exit" functions.
  *
- * The "State" template must provide:
- * - typedef called "Param" that specifies the state to be protected
- * - constructor that accepts a "Param"
- * - init() method that performs initialization
- * - cleanup() method that performs takedown
+ *  The "State" template must provide:
+ *  - typedef called "Param" that specifies the state to be protected
+ *  - constructor that accepts a "Param"
+ *  - init() method that performs initialization
+ *  - cleanup() method that performs takedown
  */
+
 template<class State>
 class init_cleanup_t {
 public:

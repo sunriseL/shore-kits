@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 #ifndef __FUNCTORS_H
 #define __FUNCTORS_H
@@ -13,6 +13,7 @@
  * @brief Base selection/projection functor. Should be extended to
  * implement other selection/projection functors.
  */
+
 class tuple_filter_t {
 
 public:
@@ -32,6 +33,7 @@ public:
      *  @return True if the specified tuple passes the
      *  selection. False otherwise.
      */
+
     virtual bool select(const tuple_t &) {
         return true;
     }
@@ -52,6 +54,7 @@ public:
      *
      *  @return void
      */
+
     virtual void project(tuple_t &dest, const tuple_t &src) {
         dest.assign(src);
     }
@@ -68,6 +71,7 @@ public:
  * determine if two source tuples pass the join predicate. Should be
  * extended to implement other join functors.
  */
+
 class tuple_join_t {
 
 public:
@@ -87,6 +91,7 @@ public:
      *  @return True if the specified tuples pass the join
      *  predicates. False otherwise.
      */
+
     virtual bool join(tuple_t &dest,
                       const tuple_t &left,
                       const tuple_t &right)=0;
@@ -114,6 +119,7 @@ public:
      *
      *  @return True if an output tuple is produced. False otherwise.
      */
+
     virtual bool aggregate(tuple_t &dest, const tuple_t &src)=0;
 
 
@@ -127,6 +133,7 @@ public:
      *
      *  @return True if an output tuple is produced. False otherwise.
      */
+
     virtual bool eof(tuple_t &dest)=0;
     
   

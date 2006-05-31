@@ -1,4 +1,5 @@
 /* -*- mode:C++ c-basic-offset:4 -*- */
+
 #ifndef __SCALAR_AGGREGATE_H
 #define __SCALAR_AGGREGATE_H
 
@@ -10,9 +11,11 @@
 
 using namespace qpipe;
 
+
 /**
- * @brief Packet definition for the Aggregation stage
+ *  @brief Packet definition for the Aggregation stage
  */
+
 struct scalar_aggregate_packet_t : public packet_t {
 
   // all aggregates receive their inputs from a buffer
@@ -47,6 +50,7 @@ struct scalar_aggregate_packet_t : public packet_t {
  *  @brief Aggregation stage that aggregates over all input tuples to
  *  produce one final output tuple.
  */
+
 class scalar_aggregate_stage_t : public stage_t {
 
 public:

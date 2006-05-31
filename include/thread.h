@@ -1,9 +1,10 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef __THREAD_H
 #define __THREAD_H
 
 
-// pthread should always be the first include!
+// pthread.h should always be the first include!
 #include <pthread.h>
 #include <cstdio>
 #include <cstdlib>
@@ -11,6 +12,7 @@
 #include <cassert>
 
 #include "utils.h"
+
 
 
 // include me last!!!
@@ -35,7 +37,7 @@ public:
 protected:
 
   thread_t(void);
-  
+
   int init_thread_name  (const char* format, ...);
   int init_thread_name_v(const char* format, va_list ap);
 };
@@ -71,6 +73,7 @@ void pthread_cond_wait_wrapper(pthread_cond_t* cond,
 			       pthread_mutex_t* mutex);
 
 
+
 /**
  * @brief A critical section manager.
  *
@@ -89,6 +92,8 @@ struct critical_section_state_t {
     void init() { pthread_mutex_lock_wrapper(_mutex); }
     void cleanup() { pthread_mutex_unlock_wrapper(_mutex); }
 };
+
+
 
 typedef init_cleanup_t<critical_section_state_t> critical_section_t;
 

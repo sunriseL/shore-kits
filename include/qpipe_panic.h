@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef _QPIPE_PANIC_H
 #define _QPIPE_PANIC_H
 

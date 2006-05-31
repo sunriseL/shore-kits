@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef __TESTER_THREAD_H
 #define __TESTER_THREAD_H
 
@@ -15,6 +16,7 @@
 class tester_thread_t : public thread_t {
 
 private:
+
   void* (*start) (void*);
   void* start_arg;
 
@@ -24,6 +26,7 @@ public:
     return start(start_arg);
   }
 
+
   tester_thread_t(void* (*start_routine)(void *), void* arg, const char* format, ...) 
     : start(start_routine), start_arg(arg)
   {
@@ -32,6 +35,7 @@ public:
     init_thread_name_v(format, ap);
     va_end(ap);
   }
+
 };
 
 

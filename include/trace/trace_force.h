@@ -15,12 +15,10 @@
 
 
 
-
 /* exported functions */
 
 void trace_force_(const char* filename, int line_num, const char* function_name,
 		  char* format, ...);
-
 
 
 
@@ -42,7 +40,6 @@ void trace_force_(const char* filename, int line_num, const char* function_name,
  */
 
 #define TRACE_FORCE(format, rest...) trace_force_(__FILE__, __LINE__, __FUNCTION__, format, ##rest)
-
 
 
 

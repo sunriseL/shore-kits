@@ -1,4 +1,5 @@
 /* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef __AGGREGATE_H
 #define __AGGREGATE_H
 
@@ -10,9 +11,11 @@
 
 using namespace qpipe;
 
+
 /**
- * @brief Packet definition for the Aggregation stage
+ *  @brief Packet definition for the aggregation stage.
  */
+
 struct aggregate_packet_t : public packet_t {
   
     tuple_buffer_t *input_buffer;
@@ -33,10 +36,12 @@ struct aggregate_packet_t : public packet_t {
 };
 
 
+
 /**
- * @brief Aggregation stage that aggregates over grouped inputs. It
- * produces one output tuple for each input set of tuples.
+ *  @brief Aggregation stage that aggregates over grouped inputs. It
+ *  produces one output tuple for each input set of tuples.
  */
+
 class aggregate_stage_t : public stage_t {
  public:
     aggregate_stage_t()
@@ -51,5 +56,7 @@ class aggregate_stage_t : public stage_t {
     int process_packet(packet_t *packet);
 
 };
+
+
 
 #endif

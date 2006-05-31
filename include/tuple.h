@@ -1,6 +1,7 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
-#ifndef _tuple_h
-#define _tuple_h
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
+#ifndef _TUPLE_H
+#define _TUPLE_H
 
 
 // must always be the first include
@@ -13,6 +14,7 @@
 
 // for Dbt class
 #include <db_cxx.h>
+
 
 
 // include me last!!!
@@ -28,6 +30,7 @@
 
 // exported datatypes
 
+
 /**
  *  @brief QPIPE tuple. An initialized tuple stores a char* into some
  *  tuple_page_t as well as the size of the data.
@@ -40,11 +43,13 @@
  * functions must make a deep copy to a page it owns, or obtain
  * ownership of the page the tuple belongs to.
  */
+
 class tuple_t {
 
 public:
     char* data;
     size_t size;;
+
 
     tuple_t() {
 	// no data
@@ -60,6 +65,7 @@ public:
         init(data, size);
     }
 
+
     /**
      *  @brief Copy the specified tuple. This function performs a deep
      *  copy (copy of data bytes) from the src tuple to this
@@ -70,6 +76,7 @@ public:
      *
      *  @param src The tuple we are creating a copy of.
      */
+
     void assign(const tuple_t &src) {
         assert(size == src.size);
         memcpy(data, src.data, size);
@@ -84,6 +91,7 @@ private:
      *
      *  @param s this.size will be set to this value.
      */
+
     void init(char *d, size_t s) {
         data = d;
         size = s;
@@ -123,6 +131,7 @@ public:
      *  @return NULL on error (if the underlying allocator returns
      *  NULL). An initialized page otherwise.
      */
+
     static tuple_page_t *alloc(size_t tuple_size,
 			       Alloc allocate,
 			       size_t page_size=4096) {
@@ -145,6 +154,7 @@ public:
      *
      *  @return An initialized page otherwise.
      */
+
     static tuple_page_t *mount(page_t *page) {
 	
 	// error checking
@@ -166,6 +176,7 @@ public:
      *
      *  @return An initialized page otherwise.
      */
+
     static tuple_page_t *init(page_t *page, size_t tuple_size) {
 
 	// error checking
@@ -179,6 +190,7 @@ public:
      *
      *  @return See description.
      */
+
     size_t tuple_size()  const { return _tuple_size; }
 
 
@@ -187,6 +199,7 @@ public:
      *
      *  @return See description.
      */
+
     size_t tuple_count() const { return _tuple_count; }
 
 
@@ -196,6 +209,7 @@ public:
      *
      *  @return See description.
      */
+
     size_t capacity() const {
         return (page_size() - sizeof(tuple_page_t))/tuple_size();
     }
@@ -214,6 +228,7 @@ public:
      *  @brief Returns true if and only if this page currently
      *  contains zero tuples.
      */
+
     bool empty() const {
         return !tuple_count();
     }
@@ -223,6 +238,7 @@ public:
      *  @brief Returns true if and only if this page currently
      *  contains the maximum number of tuples it can fit.
      */
+
     bool full() const {
         return tuple_count() == capacity();
     }
@@ -234,6 +250,7 @@ public:
      *
      *  @param index The tuple index. Tuples are zero-indexed.
      */
+
     char *get_tuple_data(size_t index) {
         return &_data[index*tuple_size()];
     }
@@ -245,6 +262,7 @@ public:
      *
      *  @param index The tuple index. Tuples are zero-indexed.
      */
+
     tuple_t get_tuple(size_t index) {
         return tuple_t(get_tuple_data(index), tuple_size());
     }
@@ -258,6 +276,7 @@ public:
      *
      *  @return The number of tuples read.
      */
+
     int fread(FILE *file) {
         char *base = &_data[_end_offset];
         int max = capacity() - tuple_size();
@@ -275,6 +294,7 @@ public:
      *
      *  @return The number of tuples written.
      */
+
     int fwrite(FILE *file) {
         return ::fwrite(_data, tuple_size(), tuple_count(), file);
     }
@@ -292,6 +312,7 @@ public:
      *  @return true on successful allocate. false on failure (if the
      *  page is full).
      */
+
     bool append_mount(tuple_t &tuple) {
         tuple.size = tuple_size();
         tuple.data = allocate_tuple();
@@ -311,6 +332,7 @@ public:
      *  @return true on successful allocate and copy. False if the
      *  page is * full
      */
+
     bool append_init(const tuple_t &tuple) {
 
 	// error checking
@@ -331,6 +353,7 @@ public:
      *  @brief Iterator over the tuples in this page. Each dereference
      *  returns a tuple_t.
      */
+
     class iterator {
 
     private:
@@ -391,13 +414,13 @@ public:
     
 protected:
 
-
     /**
      *  @brief Try to allocate space for a new tuple.
      *
      *  @return NULL if the page is full. Otherwise, the address of
      *  the newly allocated tuple.
      */
+
     char *allocate_tuple() {
 
         if(tuple_count() == capacity())
@@ -410,6 +433,7 @@ protected:
         return result;
     }
     
+
     tuple_page_t() {
         // sanity check
         assert(tuple_size()*tuple_count() == _end_offset);
@@ -422,6 +446,7 @@ protected:
      *
      *  @param tuple_size The size of the tuples stored in this page.
      */
+
     tuple_page_t(size_t tuple_size)
         : _tuple_size(tuple_size),
           _tuple_count(0),
@@ -480,6 +505,7 @@ public:
      *  @return 0 on successful insert. Non-zero if the buffer was
      *  closed by the consumer.
      */
+
     int put_tuple (const tuple_t &tuple) {
 
         if(check_page_full())
@@ -504,6 +530,7 @@ public:
      *  @return 0 on successful insert. Non-zero if the buffer was
      *  closed by the consumer.
      */
+
     int put_page(tuple_page_t *page) {
         return page_buffer.write(page);
     }
@@ -524,6 +551,7 @@ public:
      *  closed the buffer or if the current page of the buffer is
      *  full.
      */
+
     int alloc_tuple(tuple_t &tuple) {
         if(check_page_full())
             return 1;
@@ -549,7 +577,8 @@ public:
      *  has closed the buffer). Otherwise, a page of tuples (some of
      *  which may have been returned previously by calls to
      *  get_tuple()).
-    */
+     */
+
     tuple_page_t *get_page() {
 
 	// cast the next page in the buffer to a page with a
@@ -559,9 +588,7 @@ public:
 
 
     int wait_for_input(); 
-  
     void close();
-
     void send_eof();
 
 
@@ -571,6 +598,7 @@ public:
      *  producer has closed its end of the buffer and we have read
      *  every tuple of every page in this buffer.
      */
+
     bool eof() {
 
         return page_buffer.stopped_writing()
@@ -581,8 +609,8 @@ public:
             && read_iterator == read_page->end();
     }
  
+
     void init_buffer();
- 
     int wait_init(bool block=true);
 
 
@@ -592,6 +620,7 @@ public:
      *  value is stored in the lastTransmit variable. This function is
      *  currently not implemented.
      */
+
     void send_update();
   
 
@@ -609,6 +638,7 @@ public:
      *
      *  @param page_size The size of the pages used in our buffer.
      */
+
     tuple_buffer_t(size_t tuple_size,
                    int num_pages=DEFAULT_BUFFER_PAGES,
                    int page_size=4096)
@@ -627,6 +657,8 @@ protected:
 
     int init(size_t tuple_size, size_t num_pages);
 };
+
+
 
 #include "namespace.h"
 #endif

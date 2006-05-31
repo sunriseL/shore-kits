@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #ifndef _STAGE_H
 #define _STAGE_H
 
@@ -23,6 +24,7 @@ class stage_t;
  *  this wrapper, we can avoid duplicating close() code at every exit
  *  point.
  */
+
 struct buffer_closer_t {
 
     tuple_buffer_t *buffer;
@@ -48,6 +50,7 @@ struct buffer_closer_t {
  *  completed) and a process_next_packet() function that worker
  *  threads can call to process the packets.
  */
+
 class stage_t {
 
 public:
@@ -107,10 +110,13 @@ protected:
        that stage. */
     virtual int process_packet(packet_t *packet)=0;
 
+
     packet_t* dequeue();
     
+
     void set_not_mergeable(packet_t *packet);
     
+
     /**
      *  @brief Write a tuple to each waiting output buffer in a chain of
      *  packets.
@@ -118,11 +124,13 @@ protected:
      *  @return 0 on success. Non-zero on error (such as early
      *  termination).
      */
+
     int output(packet_t* packet, const tuple_t &tuple);
 
     /**
      *  @brief cleans up after completing work on a packet.
      */
+
     void done(packet_t *packet);
 
 };
