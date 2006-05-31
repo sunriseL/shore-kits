@@ -1,4 +1,4 @@
-// -*- C++ -*-
+/* -*- mode:C++; c-basic-offset:4 -*- */
 #ifndef __UTILS_H
 #define __UTILS_H
 
