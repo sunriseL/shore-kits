@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 /** @file trace_print_pthread.cpp
  *
@@ -9,7 +9,6 @@
  *  @bug None known.
  */
 #include "trace/trace_print_pthread.h" /* for prototypes */
-
 
 
 
@@ -27,6 +26,7 @@
  *
  *  @return void
  */
+
 void trace_print_pthread(FILE* out_stream, pthread_t thread)
 {
 

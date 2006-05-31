@@ -1,4 +1,4 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 #include "stages/scalar_aggregate.h"
 #include "trace/trace.h"
@@ -10,10 +10,12 @@ void scalar_aggregate_packet_t::terminate() {
 }
 
 
+
 /**
  *
  *
  */
+
 int scalar_aggregate_stage_t::process_packet(packet_t* p)
 {
     scalar_aggregate_packet_t* packet = (scalar_aggregate_packet_t*)p;

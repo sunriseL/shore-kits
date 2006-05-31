@@ -1,8 +1,8 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #include "thread.h"
 #include "stage.h"
 #include "trace/trace.h"
-
 
 
 
@@ -10,9 +10,11 @@
 #include "namespace.h"
 
 
+
 /**
  *  @brief packet_t constructor.
  */
+
 packet_t::packet_t(DbTxn* tid,
 		   char* pack_id,
 		   tuple_buffer_t* outbuf,
@@ -33,12 +35,12 @@ packet_t::packet_t(DbTxn* tid,
 
 
 
-
 /**
  *  @brief packet_t destructor.
  */
-packet_t::~packet_t(void)
-{
+
+packet_t::~packet_t(void) {
+    
   TRACE(TRACE_PACKET_FLOW, "Destroying packet with ID %s\n", packet_id);
 
   pthread_mutex_destroy_wrapper(&merge_mutex);
@@ -48,12 +50,12 @@ packet_t::~packet_t(void)
 
 
 
-
 /**
  *  @brief Link the specified packet to this one.
  */
-void packet_t::merge(packet_t* packet)
-{
+
+void packet_t::merge(packet_t* packet) {
+    
   TRACE(TRACE_PACKET_FLOW, "Adding packet %s to chain of packet %s\n",
 	packet->packet_id,
 	packet_id);
@@ -66,6 +68,7 @@ void packet_t::merge(packet_t* packet)
   
   pthread_mutex_unlock_wrapper(&merge_mutex);
 }
+
 
 
 #include "namespace.h"

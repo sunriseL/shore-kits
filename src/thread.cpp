@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #include "thread.h"
 #include "trace/trace.h"
 #include "qpipe_panic.h"
@@ -9,7 +10,6 @@
 
 #include <cstdio>
 #include <cstring>
-
 
 
 
@@ -80,6 +80,7 @@ int thread_t::init_thread_name(const char* format, ...)
 }
 
 
+
 int thread_t::init_thread_name_v(const char* format, va_list ap)
 {
   // construct thread name
@@ -99,6 +100,7 @@ int thread_t::init_thread_name_v(const char* format, va_list ap)
  *
  *  @return void
  */
+
 void thread_init(void)
 {
   if ( pthread_key_create( &THREAD_KEY_SELF, thread_destroy ) )
@@ -279,6 +281,7 @@ void pthread_cond_wait_wrapper(pthread_cond_t* cond, pthread_mutex_t* mutex)
  *
  *  @return The value returned by thread_object->run().
  */
+
 void* start_thread(void* thread_object)
 {
   qpipe::thread_t* thread = (qpipe::thread_t*)thread_object;
@@ -297,7 +300,6 @@ void* start_thread(void* thread_object)
   
   return thread->run();
 }
-
 
 
 

@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 /** @file trace_stream.cpp
  *
@@ -13,16 +13,13 @@
 
 
 
-
 using namespace qpipe;
-
 
 
 
 /* internal data structures */
 
 static pthread_mutex_t stream_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 
 
 

@@ -35,6 +35,7 @@ class page_t {
     
     template <class Alloc>
 
+
     /**
      *  @brief The only way to create page_t instances. Allocates
      *  a new page and places the page_t as its header.
@@ -124,6 +125,7 @@ private:
     int uncommitted_write_count;
     
 public:
+
     page_buffer_t(int capacity, int threshold=-1) {
         init(capacity, threshold);
     }
@@ -149,6 +151,8 @@ public:
 private:
     void init(int capacity, int threshold);
 };
+
+
 
 #include "namespace.h"
 #endif

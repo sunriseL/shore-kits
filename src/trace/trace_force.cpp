@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 /** @file trace_force.cpp
  *
@@ -16,11 +16,9 @@
 
 
 
-
 /* internal constants */
 
 #define FORCE_BUFFER_SIZE 256
-
 
 
 

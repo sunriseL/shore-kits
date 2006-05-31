@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 /** @file trace.cpp
  *
@@ -19,7 +19,6 @@
 
 
 
-
 /* exported data structures */
 
 
@@ -30,7 +29,6 @@
  *  way, any messages we print during QPIPE startup will be printed.
  */
 uint32_t trace_current_setting = ~0;
-
 
 
 

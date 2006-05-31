@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #include "thread.h"
 #include "page.h"
 
@@ -21,6 +22,7 @@
  *  becomes empty, the consumer will wait for it to contain at least
  *  this many pages.
  */
+
 void page_buffer_t::init(int capacity, int threshold) {
 
     page_buffer_t::capacity = capacity;
@@ -52,6 +54,7 @@ void page_buffer_t::init(int capacity, int threshold) {
  *  @brief Mark the page buffer as closed by the consumer. If there is
  *  a producer waiting (blocked), wake it up.
  */
+
 void page_buffer_t::stop_reading() {
 
     // * * * BEGIN CRITICAL SECTION * * *
@@ -77,6 +80,7 @@ void page_buffer_t::stop_reading() {
  *  @brief Mark the page buffer as closed by the producer. If there is
  *  a consumer waiting (blocked), wake it up.
  */
+
 void page_buffer_t::stop_writing() {
 
     // * * * BEGIN CRITICAL SECTION * * *
@@ -109,6 +113,7 @@ void page_buffer_t::stop_writing() {
  *  its end. Otherwise, the next page of buffer data. The caller of
  *  this function now becomes the owner of this page.
  */
+
 page_t *page_buffer_t::read() {
 
     // Treat the one-page-left case separately. We avoid the
@@ -201,6 +206,7 @@ page_t *page_buffer_t::read() {
  *  buffer. Future writes to the buffer will fail, returning
  *  true. false otherwise.
  */
+
 bool page_buffer_t::write(page_t *page) {
     
     assert( page != NULL );
@@ -284,6 +290,7 @@ bool page_buffer_t::write(page_t *page) {
  *  @brief Page buffer destructor. Current invokes free() on all
  *  pages.
  */
+
 page_buffer_t::~page_buffer_t() {
     // free all remaining (unclaimed) pages
     while(head) {

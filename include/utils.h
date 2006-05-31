@@ -6,6 +6,9 @@
 
 
 
+/* exported datatypes */
+
+
 /**
  *  @brief A helper class that automatically deletes a pointer when
  *  'this' goes out of scope.

@@ -1,4 +1,5 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #include "thread.h"
 #include "tuple.h"
 
@@ -16,6 +17,7 @@
  *  this function will block. If the consumer has closed the buffer If
  *  the page_buffer_t is full, this function will block.
  */
+
 int tuple_buffer_t::check_page_full() {
     // next page?
     if(write_page->full()) {
@@ -42,6 +44,7 @@ int tuple_buffer_t::check_page_full() {
  *  otherwise. If this function returns true, inputs are
  *  available.
  */
+
 int tuple_buffer_t::wait_for_input() {
  
     if(read_page != NULL)
@@ -70,6 +73,7 @@ int tuple_buffer_t::wait_for_input() {
  *  buffer. false if the buffer is empty and the producer has
  *  closed its end.
  */
+
 bool tuple_buffer_t::get_tuple(tuple_t &rec) {
     // make sure there is a valid page
     if(wait_for_input())
@@ -92,6 +96,7 @@ bool tuple_buffer_t::get_tuple(tuple_t &rec) {
  *  producer for this buffer. Once the tuples currently in the
  *  buffer are read, future read operations will fail.
  */
+
 void tuple_buffer_t::send_eof() {
     if(!write_page->empty()) {
         page_buffer.write(write_page);
@@ -108,6 +113,7 @@ void tuple_buffer_t::send_eof() {
  *  the consumer for this buffer. Future tuple insertions will
  *  fail.
  */
+
 void tuple_buffer_t::close() {
     free(read_page);
     page_buffer.stop_reading();
@@ -126,6 +132,7 @@ void tuple_buffer_t::close() {
  *  @return 0 on successful initialization. Negative value on error
  *  (if the allocate fails to create a page).
  */
+
 int tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
 
     write_page = tuple_page_t::alloc(_tuple_size, malloc);
@@ -147,6 +154,7 @@ int tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
 /**
  *  @brief tuple_buffer_t destructor.
  */
+
 tuple_buffer_t::~tuple_buffer_t() {
 
     pthread_mutex_destroy_wrapper(&init_lock);
@@ -168,6 +176,7 @@ tuple_buffer_t::~tuple_buffer_t() {
  *  unlocks the buffer and lets any thread(s) waiting on wait_init()
  *  return so they can start inserting tuples.
  */
+
 void tuple_buffer_t::init_buffer() {
     critical_section_t cs(&init_lock);
     
@@ -195,6 +204,7 @@ void tuple_buffer_t::init_buffer() {
  *  this function will return non-zero if the consumer has closed its
  *  end of the buffer.
  */
+
 int tuple_buffer_t::wait_init(bool block) {
     critical_section_t cs(&init_lock);
 
@@ -205,6 +215,7 @@ int tuple_buffer_t::wait_init(bool block) {
 
     return cs.exit(page_buffer.stopped_reading()? -1 : 0);
 }
+
 
 
 #include "namespace.h"

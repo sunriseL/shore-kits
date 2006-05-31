@@ -1,4 +1,5 @@
 /* -*- mode:C++; c-basic-offset:4 -*- */
+
 #include "stage.h"
 #include "trace/trace.h"
 #include "qpipe_panic.h"
@@ -24,12 +25,11 @@
  *  @param sname The name of this stage. The constructor will create a
  *  copy of this string.
  */
-stage_t::stage_t(const char* sname)
-{
+
+stage_t::stage_t(const char* sname) {
 
     // copy stage name
-    if ( asprintf(&stage_name, "%s", sname) == -1 )
-    {
+    if ( asprintf(&stage_name, "%s", sname) == -1 ) {
 	TRACE(TRACE_ALWAYS, "asprintf() failed on stage name: %s\n",
 	      sname);
 	QPIPE_PANIC();
@@ -51,7 +51,9 @@ stage_t::stage_t(const char* sname)
  *  do not have to be deleted here, since they are deleted when they
  *  exit.
  */
+
 stage_t::~stage_t(void) {
+
     free(stage_name);
 
     // There should be no worker threads accessing the packet queue when
@@ -69,38 +71,38 @@ stage_t::~stage_t(void) {
  *  @brief Remove the next packet in this stage's queue. If no packets
  *  are available, wait for one to appear.
  */
-packet_t* stage_t::dequeue(void)
-{
 
-  // * * * BEGIN CRITICAL SECTION * * *
-  pthread_mutex_lock_wrapper(&stage_lock);
+packet_t* stage_t::dequeue(void) {
+
+
+    // * * * BEGIN CRITICAL SECTION * * *
+    pthread_mutex_lock_wrapper(&stage_lock);
   
-  while ( stage_queue.empty() )
-  {
-      pthread_cond_wait_wrapper( &stage_queue_packet_available, &stage_lock );
-  }
+    while ( stage_queue.empty() ) {
+	pthread_cond_wait_wrapper( &stage_queue_packet_available, &stage_lock );
+    }
 
-  // remove packet
-  packet_t* p = stage_queue.front();
-  stage_queue.pop_front();
+    // remove packet
+    packet_t* p = stage_queue.front();
+    stage_queue.pop_front();
 
-  pthread_mutex_unlock_wrapper(&stage_lock);
-  // * * * END CRITICAL SECTION * * *
+    pthread_mutex_unlock_wrapper(&stage_lock);
+    // * * * END CRITICAL SECTION * * *
 
-  TRACE(TRACE_PACKET_FLOW, "Stage %s dequeued packet %s\n",
-	get_name(),
-	p->packet_id);
-  return p;
+
+    TRACE(TRACE_PACKET_FLOW, "Stage %s dequeued packet %s\n",
+	  get_name(),
+	  p->packet_id);
+  
+    return p;
 }
 
 
 
 void stage_t::enqueue(packet_t *new_pack) {
     
-
     // error checking
-    if(new_pack == NULL)
-    {
+    if(new_pack == NULL) {
 	TRACE(TRACE_ALWAYS, "Called with NULL packet for stage %s!",
 	      get_name());
 	QPIPE_PANIC();
@@ -131,8 +133,7 @@ void stage_t::enqueue(packet_t *new_pack) {
     
 	// * * * BEGIN NESTED CRITICAL SECTION * * *
 	critical_section_t cs2(&cand->merge_mutex);
-        if (cand->mergeable && cand->is_mergeable(new_pack))
-	{ 
+        if (cand->mergeable && cand->is_mergeable(new_pack)) { 
             cand->merge(new_pack);
 	    cs2.exit();	    
 	    cs.exit();
@@ -161,8 +162,7 @@ void stage_t::enqueue(packet_t *new_pack) {
 	// packets are non-mergeable from the beginning. Don't need to
 	// grab its merge_mutex because its mergeability status could
 	// not have changed while it was in the queue.
-        if (queue_pack->mergeable && queue_pack->is_mergeable(new_pack))
-	{
+        if (queue_pack->mergeable && queue_pack->is_mergeable(new_pack)) {
             queue_pack->merge(new_pack);
 	    cs.exit();
 	    return;
@@ -183,6 +183,7 @@ void stage_t::enqueue(packet_t *new_pack) {
  *  function should only be called by a worker thread for this stage,
  *  on a packet assigned to this stage.
  */
+
 void stage_t::set_not_mergeable(packet_t *packet) {
 
     // Grab stage_lock so other threads see a consistant view of the
@@ -194,15 +195,14 @@ void stage_t::set_not_mergeable(packet_t *packet) {
 
 
 
-int stage_t::process_next_packet(void)
-{
+int stage_t::process_next_packet(void) {
 
     // block until a new packet becomes available
     scope_delete_t<packet_t> packet = dequeue();
 
     if(packet == NULL) {
         // error checking
-	TRACE(TRACE_ALWAYS, "Removed NULL packet in stage %s!", name);
+	TRACE(TRACE_ALWAYS, "Removed NULL packet in stage %s!", get_name());
 	QPIPE_PANIC();
     }
 

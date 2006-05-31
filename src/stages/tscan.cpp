@@ -1,11 +1,14 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+/* -*- mode:C++; c-basic-offset:4 -*- */
+
 #include "stages/fscan.h"
 #include "qpipe_panic.h"
+
 
 
 void fscan_packet_t::terminate() {
     // TODO: not currently ever called by anyone
 }
+
 
 
 struct cursor_close_t {
@@ -27,6 +30,7 @@ struct cursor_close_t {
         }
     }
 };
+
 
 
 /** @fn    : int process_packet(packet_t *)
