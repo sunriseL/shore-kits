@@ -68,8 +68,12 @@ stage_t::~stage_t(void) {
 
 
 /**
- *  @brief Remove the next packet in this stage's queue. If no packets
- *  are available, wait for one to appear.
+ *  @brief Helper function used to remove the next packet in this
+ *  stage's queue. If no packets are available, wait for one to
+ *  appear.
+ *
+ *  This function acquires the stage_lock mutex and waits in the
+ *  stage_queue_packet_available is no packets are available.
  */
 
 packet_t* stage_t::dequeue(void) {
@@ -99,6 +103,19 @@ packet_t* stage_t::dequeue(void) {
 
 
 
+/**
+ *  @brief Add the specified packet to the stage_queue and signal any
+ *  waiting worker threads. The caller must be holding the stage_lock
+ *  mutex.
+ */
+void stage_t::add_to_stage_queue(packet_t* packet) {
+
+    stage_queue.push_back(packet);
+    pthread_cond_signal_wrapper(&stage_queue_packet_available);
+}
+
+
+
 void stage_t::enqueue(packet_t *new_pack) {
     
     // error checking
@@ -118,7 +135,7 @@ void stage_t::enqueue(packet_t *new_pack) {
 
     if ( !new_pack->mergeable ) {
 	// We are forcing the new packet to not merge with others.
-	stage_queue.push_back(new_pack);
+	add_to_stage_queue(new_pack);
 	cs.exit();
 	return;
     }
@@ -172,7 +189,7 @@ void stage_t::enqueue(packet_t *new_pack) {
 
     // No work sharing detected. We can now give up and insert the new
     // packet into the stage_queue.
-    stage_queue.push_back(new_pack);
+    add_to_stage_queue(new_pack);
     cs.exit();
 }
 

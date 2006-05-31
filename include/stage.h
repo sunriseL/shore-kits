@@ -113,6 +113,9 @@ protected:
 
     packet_t* dequeue();
     
+    
+    void add_to_stage_queue(packet_t* packet);
+    
 
     void set_not_mergeable(packet_t *packet);
     
