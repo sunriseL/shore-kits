@@ -1,4 +1,5 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+/* -*- mode:C++ c-basic-offset:4 -*- */
+
 #ifndef __PACKET_H
 #define __PACKET_H
 

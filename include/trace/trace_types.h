@@ -14,14 +14,17 @@
 
 /* exported constants */
 
-#define TRACE_ALWAYS      (1 << 0)
-#define TRACE_TUPLE_FLOW  (1 << 1)
-#define TRACE_PACKET_FLOW (1 << 2)
+#define TRACE_ALWAYS             (1 << 0)
 
-#define TRACE_SYNC_COND   (1 << 3)
-#define TRACE_SYNC_LOCK   (1 << 4)
-#define TRACE_DEBUG       (1 << 31)
+#define TRACE_TUPLE_FLOW         (1 << 1)
+#define TRACE_PACKET_FLOW        (1 << 2)
 
+#define TRACE_SYNC_COND          (1 << 3)
+#define TRACE_SYNC_LOCK          (1 << 4)
+
+#define TRACE_THREAD_LIFE_CYCLE  (1 << 5)
+
+#define TRACE_DEBUG              (1 << 31)
 
 
 #endif

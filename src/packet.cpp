@@ -1,8 +1,7 @@
-#include <pthread.h>
-
+/* -*- mode:C++ c-basic-offset:4 -*- */
+#include "thread.h"
 #include "stage.h"
 #include "trace/trace.h"
-#include "thread.h"
 
 
 
@@ -45,7 +44,6 @@ packet_t::~packet_t(void)
   pthread_mutex_destroy_wrapper(&merge_mutex);
 
   TRACE(TRACE_ALWAYS, "packet_t destructor not fully implemented... need to destroy packet ID\n");
-  //  QPIPE_PANIC();
 }
 
 

@@ -4,6 +4,35 @@
 
 #include <cstdio>
 
+
+
+/**
+ *  @brief A helper class that automatically deletes a pointer when
+ *  'this' goes out of scope.
+ */
+template <typename T>
+struct scope_delete_t {
+    T *ptr;
+    scope_delete_t(T *p)
+        : ptr(p)
+    {
+    }
+
+    ~scope_delete_t() {
+        if(ptr)
+            delete ptr;
+    }
+    operator T*() {
+        return ptr;
+    }
+    
+    T *operator ->() {
+        return ptr;
+    }
+};
+
+
+
 /**
  * @brief A helper class for operations involving setup and takedown
  * phases that must be matched (ie mutex lock/unlock, malloc/free,

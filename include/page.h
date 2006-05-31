@@ -1,58 +1,94 @@
-/* -*- mode: C++ -*- */
+/* -*- mode:C++ c-basic-offset:4 -*- */
 #ifndef _page_h
 #define _page_h
 
 #include "thread.h"
 #include <new>
 
+
+
 // include me last!!!
 #include "namespace.h"
 
+
+
+/**
+ *  @brief Wapper class for a page header that stores the page's
+ *  size. The constructor is private to prevent stray headers from
+ *  being created in the code. We instead export a static alloc()
+ *  function that allocates a new page and places a header at the
+ *  base.
+ */
 class page_t {
-private:
+
+ private:
     size_t _page_size;
     
-public:
+ public:
     page_t *next;
 
-public:
+ public:
+
     size_t page_size() const {
         return _page_size;
     }
     
     template <class Alloc>
+
+    /**
+     *  @brief The only way to create page_t instances. Allocates
+     *  a new page and places the page_t as its header.
+     *
+     *  @param allocate Allocator for "raw" pages.
+     *
+     *  @param page_size The size of the new page (including
+     *  page_t header).
+     *
+     *  @return NULL on error (if the underlying allocator returns
+     *  NULL). An initialized page otherwise.
+     */
     static page_t *alloc(Alloc allocate, size_t page_size=4096) {
+
         char *raw_page = (char *) allocate(page_size);
+	if (raw_page == NULL)
+	    return NULL;
+
         return new (raw_page) page_t(page_size);
     }
 
-protected:
+ protected:
     // called by subclass in-place constructors. No touchie fields!
     page_t() { }
 
-private:
+ private:
+
     page_t(size_t page_size)
         : _page_size(page_size), next(NULL)
-    {
-    }
+	{
+	}
 
-    // prevent attempts to copy pages because the class MUST be
-    // constructed in place; it doesn't even store a pointer to page
-    // data. A naked set of header fields would probably cause all
-    // kinds of memory bugs
+    // Prevent attempts to copy pages. The class MUST be constructed
+    // in place so we can use it to refer to the page that contains
+    // it. A naked set of header fields would probably result in us
+    // accessing invalid memory.
     page_t(const page_t &other);
     page_t &operator=(const page_t &other);
 };
 
 
-/* A thread-safe page buffer. This class allows one thread to safely
-   pass pages to another. The producing thread gives up ownership of
-   the pages it sends to the buffer.
+
+/**
+ *  @brief Thread-safe page buffer. This class allows one thread to
+ *  safely pass pages to another. The producing thread gives up
+ *  ownership of the pages it sends to the buffer.
  */
 class page_buffer_t {
+
 private:
+
     // number of pages allowed in the buffer
     int capacity;
+
     // tuning parameter
     int threshold;
 
@@ -61,9 +97,9 @@ private:
     pthread_cond_t read_notify;
     pthread_cond_t write_notify;
 
-    // the current committed size of the buffer. The reader and writer
+    // The current committed size of the buffer. The reader and writer
     // communicate through this variable, but it isn't always up to
-    // date. In order to avoid serializing unnecessarily the reader
+    // date. In order to avoid serializing unnecessarily, the reader
     // and writer do not update this regularly. The true size of the
     // buffer at any given moment is 'size + uncommitted_write_count -
     // uncommitted_read_count'.
@@ -77,7 +113,7 @@ private:
     page_t *head;
     page_t *tail;
 
-    // conservative size estimates maintained by the reader and
+    // Conservative size estimates maintained by the reader and
     // writer, respectively. They are not necessarily accurate, but
     // will never cause over/underflow.
     int read_size_guess;
@@ -95,6 +131,10 @@ public:
     ~page_buffer_t();
 
     bool empty() {
+	// Since the page may continually be filled by its producer,
+	// we can be sure that the buffer is empty if and only if the
+	// producer has finished and the reader has completely drained
+	// the buffer contents.
         return stopped_writing() && read_size_guess == 0;
     }
     page_t *read();

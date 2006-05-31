@@ -1,5 +1,9 @@
+
+#include "thread.h"
+#include "tester_thread.h"
 #include "stages/aggregate.h"
 #include "trace/trace.h"
+#include "qpipe_panic.h"
 
 using namespace qpipe;
 
@@ -10,18 +14,19 @@ using namespace qpipe;
  *
  *  @param arg A stage_t* to work on.
  */
-void *drive_stage(void *arg)
+void* drive_stage(void* arg)
 {
-    stage_t *stage = (stage_t *)arg;
-    while(1) {
-        stage->process_next_packet();
-    }
-
-    return NULL;
+  stage_t *stage = (stage_t *)arg;
+  while(1) {
+    stage->process_next_packet();
+  }
+  return NULL;
 }
 
 
-void *write_tuples(void *arg)
+
+
+void* write_tuples(void* arg)
 {
   tuple_buffer_t *buffer = (tuple_buffer_t *)arg;
 
@@ -42,8 +47,8 @@ void *write_tuples(void *arg)
       TRACE(TRACE_ALWAYS, "Inserted tuple %d\n", value);
   }
 
-    buffer->send_eof();
-    return NULL;
+  buffer->send_eof();
+  return NULL;
 }
 
 
@@ -55,6 +60,11 @@ private:
   int count;
     
 public:
+  
+  count_aggregate_t() {
+    count = 0;
+  }
+  
   virtual bool eof(tuple_t &dest) {
     break_group(dest);
     return true;
@@ -75,40 +85,42 @@ protected:
 
 int main() {
 
-    aggregate_stage_t *stage = new aggregate_stage_t();
+  thread_init();
 
-    pthread_t stage_thread;
-    pthread_t source_thread;
-    pthread_mutex_t mutex;
+  aggregate_stage_t *stage = new aggregate_stage_t();
+  tester_thread_t* aggregate_thread = new tester_thread_t(drive_stage, stage, "AGGREGATE THREAD");
+  if ( thread_create( NULL, aggregate_thread ) ) {
+    TRACE(TRACE_ALWAYS, "thread_create failed\n");
+    QPIPE_PANIC();
+  }
 
-    pthread_mutex_init_wrapper(&mutex, NULL);
+
+  // for now just aggregate straight tuples
+  tuple_buffer_t  input_buffer(sizeof(int));
+  tester_thread_t* writer_thread = new tester_thread_t(write_tuples, &input_buffer, "WRITER THREAD");
+  if ( thread_create( NULL, writer_thread ) ) {
+    TRACE(TRACE_ALWAYS, "thread_create failed\n");
+    QPIPE_PANIC();
+  }
+
+   
+  // the output is always a single int
+  tuple_buffer_t  output_buffer(sizeof(int));
+  tuple_filter_t* filter = new tuple_filter_t();
+  count_aggregate_t*  aggregator = new count_aggregate_t();
+  aggregate_packet_t* packet = new aggregate_packet_t(NULL,
+						      "test aggregate",
+						      &output_buffer,
+						      &input_buffer,
+						      aggregator,
+						      filter);
+
+  stage->enqueue(packet);
     
-    pthread_create(&stage_thread, NULL, &drive_stage, stage);
+  tuple_t output;
+  output_buffer.init_buffer();
+  while(output_buffer.get_tuple(output))
+    TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
 
-    // for now just aggregate straight tuples
-    tuple_buffer_t input_buffer(sizeof(int));
-    pthread_create(&source_thread, NULL, &write_tuples, &input_buffer);
-    
-    // the output is always a single int
-    tuple_buffer_t output_buffer(sizeof(int));
-
-    tuple_filter_t *filter = new tuple_filter_t();
-    count_aggregate_t *aggregator = new count_aggregate_t();
-    
-    aggregate_packet_t *packet = new aggregate_packet_t(NULL,
-                                                        "test aggregate",
-                                                        &output_buffer,
-                                                        &input_buffer,
-                                                        aggregator,
-                                                        filter);
-
-    stage->enqueue(packet);
-    
-    tuple_t output;
-    output_buffer.init_buffer();
-    while(output_buffer.get_tuple(output))
-        printf("Count: %d\n", *(int*)output.data);
-
-    pthread_mutex_destroy_wrapper(&mutex);
-    return 0;
+  return 0;
 }

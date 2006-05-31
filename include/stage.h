@@ -7,13 +7,13 @@
 #include "packet.h"
 
 
+
 // include me last!!!
 #include "namespace.h"
 
 
 
 class stage_t;
-
 
 
 
@@ -43,36 +43,6 @@ struct buffer_closer_t {
 
 
 
-
-/**
- *  @brief A queue of packets (work units) for a stage to process.
- */
-class stage_queue_t {
-
-private:
-  
-    stage_t* parent_stage;
-
-    pthread_mutex_t queue_mutex;
-    pthread_cond_t  queue_packet_available;
-
-    packet_list_t packet_list;
-
-public:
-
-    stage_queue_t(stage_t* stage);
-    ~stage_queue_t(void);
-
-    void      enqueue(packet_t* packet);
-    packet_t* dequeue(void);
-    void      remove_copies(packet_t* packet);
-    packet_t* find_and_merge(packet_t* packet);
-    int get_num_packets(void);
-};
-
-
-
-
 /**
  *  @brief A QPIPE stage is a queue of packets (work that must be
  *  completed) and a process_next_packet() function that worker
@@ -97,15 +67,18 @@ public:
 protected:
 
     // general information about the stage
-    const char* name;
+    char* stage_name;
 
+    // synch vars
+    pthread_mutex_t stage_lock;
+    pthread_cond_t  stage_queue_packet_available;
+    
     // packet queue
-    stage_queue_t  queue;
-    pthread_mutex_t queue_lock;
-
-    // side queue
-    packet_list_t side_queue;
-  
+    packet_list_t stage_queue;
+    
+    // set of packets currently being processed
+    packet_list_t merge_candidates;
+    
 public:
 
     stage_t(const char* sname);
@@ -115,19 +88,27 @@ public:
     /**
      *  @brief Accessor for this stage's name.
      */
-    const char* get_name() const { return name; }
+    const char* get_name() const { return stage_name; }
+
 
     /* The dispatcher can use this method to send work to this stage. */
     void enqueue(packet_t*);
+
 
     /* A worker thread for this stage should loop around this
        function. */
     int process_next_packet();
 
+
 protected:
 
+    
+    /* Each stage must override this method with the functionality of
+       that stage. */
     virtual int process_packet(packet_t *packet)=0;
 
+    packet_t* dequeue();
+    
     void set_not_mergeable(packet_t *packet);
     
     /**
@@ -145,6 +126,8 @@ protected:
     void done(packet_t *packet);
 
 };
+
+
 
 #include "namespace.h"
 #endif

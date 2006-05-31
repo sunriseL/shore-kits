@@ -1,18 +1,22 @@
 // -*- mode:C++ c-basic-offset:4 -*-
 
-#include "stages/aggregate.h"
+#include "stages/scalar_aggregate.h"
+#include "trace/trace.h"
 
 
 
-void aggregate_packet_t::terminate() {
+void scalar_aggregate_packet_t::terminate() {
     input_buffer->close();
 }
 
 
-int aggregate_stage_t::process_packet(packet_t *p) {
-
-    aggregate_packet_t *packet = (aggregate_packet_t *)p;
-
+/**
+ *
+ *
+ */
+int scalar_aggregate_stage_t::process_packet(packet_t* p)
+{
+    scalar_aggregate_packet_t* packet = (scalar_aggregate_packet_t*)p;
 
     // automatically close the input buffer when this function exits
     buffer_closer_t input = packet->input_buffer;
@@ -32,14 +36,12 @@ int aggregate_stage_t::process_packet(packet_t *p) {
     while(input->get_tuple(src)) {
 	TRACE(TRACE_TUPLE_FLOW, "get_tuple() returned a new tuple with size %d\n", src.size);
 	if ( aggregate->aggregate(dest, src) )
-	    if ( output(packet, dest) )
-		return 1;
+	    output(packet, dest);
     }
     
     // collect aggregate results
     if ( aggregate->eof(dest) )
-	if ( output(packet, dest) )
-	    return 1;
-    
+	output(packet, dest);
+
     return 0;
 }

@@ -9,7 +9,6 @@
 
 
 
-
 /** 
  * @brief Base selection/projection functor. Should be extended to
  * implement other selection/projection functors.
@@ -18,31 +17,49 @@ class tuple_filter_t {
 
 public:
 
+
     /**
      *  @brief Determine which attributes (if any) of a given source
      *  tuple pass an internal set of predicates. Should be applied to
      *  the output of a stage to implement either selection or
-     *  projection. This default implementation allows every attribute
-     *  of every source tuple to pass.
+     *  projection.
      *
-     *  @param dest If the src tuple passes this filter, it is assigned
-     *  to this tuple.
+     *  This default implementation allows every attribute of every
+     *  source tuple to pass.
      *
-     *  @param src The tuple we are testing with the filter.
+     *  @param src The tuple we are checking.
      *
-     *  @return True if the specified tuple passes the filter. False
-     *  otherwise.
+     *  @return True if the specified tuple passes the
+     *  selection. False otherwise.
      */
     virtual bool select(const tuple_t &) {
         return true;
     }
+
+
+    /**
+     *  @brief Project some threads from the src to the dest tuple.
+     *
+     *  This default implementation copies the entire tuple, so dest
+     *  must point to a location with at least src.size bytes
+     *  available.
+     *
+     *  @param src Our source tuple.
+     *
+     *  @param dest We copy the necessary attributes here. This tuple
+     *  should already point into a tuple_buffer_t where we can store
+     *  data.
+     *
+     *  @return void
+     */
     virtual void project(tuple_t &dest, const tuple_t &src) {
         dest.assign(src);
     }
-    virtual ~tuple_filter_t() { }
-    
-};
 
+    
+    virtual ~tuple_filter_t() { }
+
+};
 
 
 
@@ -52,6 +69,7 @@ public:
  * extended to implement other join functors.
  */
 class tuple_join_t {
+
 public:
 
 
@@ -78,22 +96,31 @@ public:
 
 
 
-
 /** 
  * @brief Base aggregation functor. Should be extended to implement
  * other aggregation functors.
  */
-class tuple_aggregate_t : public tuple_filter_t {
+class tuple_aggregate_t {
 
 public:
 
+    
     /**
-     *  @brief We would like to use the same functor to implement both
-     *  scalar and GROUP-BY aggregation. The filter() function inherited
-     *  from tuple_filter_t produces an output tuple (returns true)
-     *  every time it detects a GROUP-BY attribute transition. This if
-     *  called to produce the final output tuple when all input tuples
-     *  have been aggregated.
+     *  @brief Update the internal aggregate state and determine if a
+     *  new output tuple can be produced (if a group break occurred).
+     *
+     *  @param dest If an output tuple is produced, it is assigned to
+     *  this tuple.
+     *
+     *  @return True if an output tuple is produced. False otherwise.
+     */
+    virtual bool aggregate(tuple_t &dest, const tuple_t &src)=0;
+
+
+    /**
+     *  @brief Do a final update of the internal aggregate state and
+     *  (possibly) produce a final output tuple. This method should be
+     *  invoked when there are no more source tuples to be aggregated.
      *
      *  @param dest If an output tuple is produced, it is assigned to
      *  this tuple.
@@ -106,6 +133,8 @@ public:
     virtual ~tuple_aggregate_t() { }
 
 };
+
+
 
 #include "namespace.h"
 #endif	// __FUNCTORS_H
