@@ -32,7 +32,8 @@ int scalar_aggregate_stage_t::process_packet(packet_t* p)
     char dest_data[dest_size];
     tuple_t dest(dest_data, dest_size);
 
-
+    input->init_buffer();
+    
     // we update the aggregate state by invoking select()
     TRACE(TRACE_TUPLE_FLOW, "Going to call get_tuple()\n");
     while(input->get_tuple(src)) {
