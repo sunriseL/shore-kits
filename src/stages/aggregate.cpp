@@ -1,6 +1,7 @@
 // -*- mode:C++; c-basic-offset:4 -*-
 
 #include "stages/aggregate.h"
+#include "trace/trace.h"
 
 
 

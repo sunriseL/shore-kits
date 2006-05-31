@@ -65,22 +65,17 @@ public:
     count = 0;
   }
   
-  virtual bool eof(tuple_t &dest) {
-    break_group(dest);
-    return true;
-  }
-protected:
-
-  void break_group(tuple_t &dest) {
-    *(int*)dest.data = count;
-  }
-
-  virtual bool filter(tuple_t &, const tuple_t &) {
-    // ignore group breaks for now
+  bool aggregate(tuple_t &, const tuple_t &) {
     count++;
     return false;
   }
+
+  bool eof(tuple_t &dest) {
+    *(int*)dest.data = count;
+    return true;
+  }
 };
+
 
 
 int main() {

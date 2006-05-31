@@ -1,7 +1,7 @@
 # -*- makefile -*-
 INCLUDES = -I$(top_srcdir)/include
 
-STAGES = stages/scalar_aggregate.cpp #stages/aggregate.cpp stages/fscan.cpp
+STAGES = stages/scalar_aggregate.cpp stages/aggregate.cpp #stages/fscan.cpp
 
 TRACE = trace/trace.cpp trace/trace_force.cpp \
 	trace/trace_print_pthread.cpp trace/trace_stream.cpp
