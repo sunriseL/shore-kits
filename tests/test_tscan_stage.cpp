@@ -1,0 +1,88 @@
+// -*- mode:C++ c-basic-offset:4 -*-
+#include "stages/aggregate.h"
+#include "trace/trace.h"
+
+using namespace qpipe;
+
+
+
+/** @fn    : void * drive_stage(void *)
+ *  @brief : Simulates a worker thread on the specified stage.
+ *  @param : arg A stage_t* to work on.
+ */
+
+void *drive_stage(void *arg)
+{
+    stage_t *stage = (stage_t *)arg;
+
+    while(1) {
+        stage->process_next_packet();
+    }
+
+    return NULL;
+}
+
+
+class count_aggregate_t : public tuple_aggregate_t {
+
+private:
+  int count;
+    
+public:
+  virtual bool eof(tuple_t &dest) {
+    break_group(dest);
+    return true;
+  }
+protected:
+
+  void break_group(tuple_t &dest) {
+    *(int*)dest.data = count;
+  }
+
+  virtual bool filter(tuple_t &, const tuple_t &) {
+    // ignore group breaks for now
+    count++;
+    return false;
+  }
+};
+
+
+int main() {
+
+    aggregate_stage_t *stage = new aggregate_stage_t();
+
+    pthread_t stage_thread;
+    pthread_t source_thread;
+    pthread_mutex_t mutex;
+
+    pthread_mutex_init_wrapper(&mutex, NULL);
+    
+    pthread_create(&stage_thread, NULL, &drive_stage, stage);
+
+    // for now just aggregate straight tuples
+    tuple_buffer_t input_buffer(sizeof(int));
+    pthread_create(&source_thread, NULL, &write_tuples, &input_buffer);
+    
+    // the output is always a single int
+    tuple_buffer_t output_buffer(sizeof(int));
+
+    tuple_filter_t *filter = new tuple_filter_t();
+    count_aggregate_t *aggregator = new count_aggregate_t();
+    
+    aggregate_packet_t *packet = new aggregate_packet_t(NULL,
+                                                        "test aggregate",
+                                                        &output_buffer,
+                                                        &input_buffer,
+                                                        aggregator,
+                                                        filter);
+
+    stage->enqueue(packet);
+    
+    tuple_t output;
+    output_buffer.init_buffer();
+    while(output_buffer.get_tuple(output))
+        printf("Count: %d\n", *(int*)output.data);
+
+    pthread_mutex_destroy_wrapper(&mutex);
+    return 0;
+}

@@ -2,9 +2,11 @@
 #include "stages/fscan.h"
 #include "qpipe_panic.h"
 
+
 void fscan_packet_t::terminate() {
     // TODO: not currently ever called by anyone
 }
+
 
 struct cursor_close_t {
     typedef Dbc *Param;
@@ -25,6 +27,12 @@ struct cursor_close_t {
         }
     }
 };
+
+
+/** @fn    : int process_packet(packet_t *)
+ *  @brief : The (virtual) function that does the actual processing,
+ *           for the table scan stage.
+ */
 
 int fscan_stage_t::process_packet(packet_t *p) {
 

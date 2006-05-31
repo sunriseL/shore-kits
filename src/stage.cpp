@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 #include "stage.h"
 #include "trace/trace.h"
 #include "qpipe_panic.h"
@@ -51,8 +51,7 @@ stage_t::stage_t(const char* sname)
  *  do not have to be deleted here, since they are deleted when they
  *  exit.
  */
-stage_t::~stage_t(void)
-{
+stage_t::~stage_t(void) {
     free(stage_name);
 
     // There should be no worker threads accessing the packet queue when
@@ -200,13 +199,12 @@ int stage_t::process_next_packet(void)
 
     // block until a new packet becomes available
     scope_delete_t<packet_t> packet = dequeue();
-    if(packet == NULL)
-    {
-	// error checking
-	TRACE(TRACE_ALWAYS, "Removed NULL packet in stage %s!", get_name());
+
+    if(packet == NULL) {
+        // error checking
+	TRACE(TRACE_ALWAYS, "Removed NULL packet in stage %s!", name);
 	QPIPE_PANIC();
     }
-  
 
     // TODO: process rebinding instructions here
   
@@ -236,6 +234,7 @@ int stage_t::process_next_packet(void)
     TRACE(TRACE_DEBUG, "wait_init() returned for %s\n", packet->packet_id);
 
     int early_termination = process_packet(packet);
+
     if(early_termination) {
         // TODO: something special?
     }

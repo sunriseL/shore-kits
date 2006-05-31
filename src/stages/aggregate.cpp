@@ -1,4 +1,4 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+// -*- mode:C++; c-basic-offset:4 -*-
 
 #include "stages/aggregate.h"
 
@@ -29,6 +29,7 @@ int aggregate_stage_t::process_packet(packet_t *p) {
 
     // we update the aggregate state by invoking select()
     TRACE(TRACE_TUPLE_FLOW, "Going to call get_tuple()\n");
+
     while(input->get_tuple(src)) {
 	TRACE(TRACE_TUPLE_FLOW, "get_tuple() returned a new tuple with size %d\n", src.size);
 	if ( aggregate->aggregate(dest, src) )
