@@ -22,16 +22,16 @@
 /**
  *  @brief Stage constructor.
  *
- *  @param sname The name of this stage. The constructor will create a
- *  copy of this string.
+ *  @param stage_name The name of this stage. The constructor will
+ *  create a copy of this string.
  */
 
-stage_t::stage_t(const char* sname) {
+stage_t::stage_t(const char* stage_name) {
 
     // copy stage name
-    if ( asprintf(&stage_name, "%s", sname) == -1 ) {
-	TRACE(TRACE_ALWAYS, "asprintf() failed on stage name: %s\n",
-	      sname);
+    if ( asprintf(&_stage_name, "%s", stage_name) == -1 ) {
+	TRACE(TRACE_ALWAYS, "asprintf() failed on stage: %s\n",
+	      stage_name);
 	QPIPE_PANIC();
     }
   
@@ -41,6 +41,9 @@ stage_t::stage_t(const char* sname) {
     // condition variable that worker threads can wait on to
     // deschedule until more packets arrive
     pthread_cond_init_wrapper(&stage_queue_packet_available, NULL);
+
+    // the subclass must register itself with the dispatcher for all
+    // the packet types it wishes to handle
 }
 
 
@@ -54,7 +57,7 @@ stage_t::stage_t(const char* sname) {
 
 stage_t::~stage_t(void) {
 
-    free(stage_name);
+    free(_stage_name);
 
     // There should be no worker threads accessing the packet queue when
     // this function is called. Otherwise, we get race conditions and

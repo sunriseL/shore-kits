@@ -53,24 +53,10 @@ struct buffer_closer_t {
 
 class stage_t {
 
-public:
-
-    typedef enum {
-        STAGE_IPROBE = 1,
-        STAGE_INSERT,
-        STAGE_UPDATE,
-        STAGE_DELETE,
-        STAGE_SCAN,
-        STAGE_AGGREGATE,
-        STAGE_SORT,
-        STAGE_JOIN,
-        STAGE_OTHER,
-    } type_t;
-
 protected:
 
     // general information about the stage
-    char* stage_name;
+    char* _stage_name;
 
     // synch vars
     pthread_mutex_t stage_lock;
@@ -84,14 +70,14 @@ protected:
     
 public:
 
-    stage_t(const char* sname);
+    stage_t(const char* stage_name);
     virtual ~stage_t();
-
+    
 
     /**
      *  @brief Accessor for this stage's name.
      */
-    const char* get_name() const { return stage_name; }
+    const char* get_name() const { return _stage_name; }
 
 
     /* The dispatcher can use this method to send work to this stage. */

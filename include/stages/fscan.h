@@ -9,6 +9,7 @@
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
+#include "dispatcher/dispatcher.h"
 
 
 
@@ -52,6 +53,8 @@ public:
   fscan_stage_t()
     : stage_t("FSCAN_STAGE")
     {
+	// register with the dispatcher
+	dispatcher_t::register_stage("FSCAN", this);	
     }
 
 protected:

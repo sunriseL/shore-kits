@@ -1,0 +1,50 @@
+
+
+PACKET TERMINATION
+
+(1) Query shutdown - need to propagate shutdown down the query
+    plan tree. We must distinguish between two cases
+
+    - shutting down a child that is running (we can simply close the
+      input buffer and rely on a worker thread destroying the packet)
+
+    - shutting down a child packet that have not been picked up by a
+      worker thread (we must delete the packet)
+
+(2) Merge shutdown - TWO PACKET WHICH HAVE BEEN MERGED RECEIVE THEIR
+    INPUT FROM THE SAME SOURCE. We need to shut down the input sources
+    which are no longer needed.
+
+(3) Error shutdown - If we cannot allocate a buffer that we need, we
+    need a way to ABORT the entire query. This cannot be handled by
+    going to the top node and propagating shutdown down the query
+    plan. The top node may not know about intermediate packets that we
+    dispatched to perform a complex operation (i.e. a SORT dispatching
+    a FDUMP packet). We really need a way to send a shutdown to our
+    comsumer(s) and have that propagate up the query plan.
+
+
+
+SOLUTION
+
+We add the following fields to a stage
+
+- count of worker threads running
+- condition variable that is signaled when the stage exits
+
+We perform shutdown in two phases
+
+(1) Mark all stages as shut down. Now when worker threads finish their
+packets, they see this shutdown status and simply exit rather than
+going back to the stage_queue.
+
+(2) Kill off all queries (by closing their buffers and having the
+shutdown propagate). If a packet has already dispatched its child
+packets, it should not bother freeing it. It should clean up its local
+state, destroy any packets it has not dispatched, and recursively
+invoke terminate on packets it has already send out.
+
+(3) Once all worker threads for a stage have exited, simply delete the
+stage. The stage destructor deletes every packet in its stage
+queue. We know that no one else can touch this queue since all workers
+have exited.

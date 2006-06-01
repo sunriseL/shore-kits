@@ -9,10 +9,6 @@
 
 /* internal helper functions */
 
-int process_file(packet_t* packet, FILE* file, tuple_page_t* tuple_page);
-
-
-
 void fscan_packet_t::terminate() {
     
 }
@@ -46,14 +42,14 @@ int fscan_stage_t::process_packet(packet_t* p) {
 	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
 	if ( fclose(file) ) {
 	    TRACE(TRACE_ALWAYS, "fclose() failed\n");
-	    // drop to to return -1
+	    // drop down to return -1
 	}
 	return -1;
     }
 
 
     // read the file
-    if ( process_file(packet, file, tuple_page) ) {
+    if ( read_file(packet, file, tuple_page) ) {
 	TRACE(TRACE_ALWAYS, "process_file() failed for file %s\n",
 	      packet->_filename);
 	return_value = -1;

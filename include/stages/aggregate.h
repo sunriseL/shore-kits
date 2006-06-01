@@ -6,10 +6,12 @@
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
+#include "dispatcher/dispatcher.h"
 
 
 
 using namespace qpipe;
+
 
 
 /**
@@ -46,6 +48,8 @@ class aggregate_stage_t : public stage_t {
     aggregate_stage_t()
 	: stage_t("AGGREGATE_STAGE")
 	{
+	    // register with the dispatcher
+	    dispatcher_t::register_stage("AGGREGATE", this);
 	}
 
     ~aggregate_stage_t() { }
