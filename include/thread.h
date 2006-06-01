@@ -78,24 +78,20 @@ void pthread_cond_wait_wrapper(pthread_cond_t* cond,
  * @brief A critical section manager.
  *
  * Locks and unlocks the specified mutex upon construction and
- * following call to 'exit', respectively. Also verifies that the
- * mutex is unlocked exactly once during this object's lifetime.
+ * destruction respectively. 
  */
-struct critical_section_state_t {
 
-    typedef pthread_mutex_t *Param;
-    Param _mutex;
-    critical_section_state_t(Param mutex)
+struct critical_section_t {
+    pthread_mutex_t *_mutex;
+    critical_section_t(pthread_mutex_t *mutex)
         : _mutex(mutex)
     {
+        pthread_mutex_lock_wrapper(_mutex);
     }
-    void init() { pthread_mutex_lock_wrapper(_mutex); }
-    void cleanup() { pthread_mutex_unlock_wrapper(_mutex); }
+    ~critical_section_t() {
+        pthread_mutex_unlock_wrapper(_mutex);
+    }
 };
-
-
-
-typedef init_cleanup_t<critical_section_state_t> critical_section_t;
 
 
 

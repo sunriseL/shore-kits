@@ -143,5 +143,29 @@ public:
 
 
 
+/**
+ *@brief Base comparison functor. Extend it to implement specific
+ *comparisons on tuple field(s)
+ */
+
+class tuple_comparator_t {
+public:
+
+    /**
+     * @brief Determines the lexicographical relationship between
+     * tuples (a) and (b). Ascending sorts based on this
+     * comparison will produce outputs ordered such that
+     * compare(tuple[i], tuple[i+1]) < 0 for every i.
+     *
+     * @return negative if a < b, positive if a > b, and zero if a == b
+     */
+    
+    virtual int compare(const tuple_t &a, const tuple_t &b)=0;
+
+
+    
+    virtual ~tuple_comparator_t() { }
+};
+
 #include "namespace.h"
 #endif	// __FUNCTORS_H

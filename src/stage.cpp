@@ -138,7 +138,6 @@ void stage_t::enqueue(packet_t *new_pack) {
     if ( !new_pack->mergeable ) {
 	// We are forcing the new packet to not merge with others.
 	add_to_stage_queue(new_pack);
-	cs.exit();
 	return;
     }
 
@@ -154,11 +153,8 @@ void stage_t::enqueue(packet_t *new_pack) {
 	critical_section_t cs2(&cand->merge_mutex);
         if (cand->mergeable && cand->is_mergeable(new_pack)) { 
             cand->merge(new_pack);
-	    cs2.exit();	    
-	    cs.exit();
 	    return;
 	}
-        cs2.exit();
 	// * * * END NESTED CRITICAL SECTION * * *
     }
     
@@ -183,7 +179,6 @@ void stage_t::enqueue(packet_t *new_pack) {
 	// not have changed while it was in the queue.
         if (queue_pack->mergeable && queue_pack->is_mergeable(new_pack)) {
             queue_pack->merge(new_pack);
-	    cs.exit();
 	    return;
 	}
     }
@@ -192,7 +187,8 @@ void stage_t::enqueue(packet_t *new_pack) {
     // No work sharing detected. We can now give up and insert the new
     // packet into the stage_queue.
     add_to_stage_queue(new_pack);
-    cs.exit();
+    
+    // * * * END CRITICAL SECTION * * *
 }
 
 
@@ -209,7 +205,8 @@ void stage_t::set_not_mergeable(packet_t *packet) {
     // packet (for example, threads calling enqueue()).
     critical_section_t cs(&stage_lock);
     packet->mergeable = false;
-    cs.exit();
+    
+    // * * * END CRITICAL SECTION * * *
 }
 
 
@@ -242,8 +239,6 @@ int stage_t::process_next_packet(void) {
         packet->terminate();
         packet->merged_packets.pop_back();
         
-        cs.exit();
-        
         // TODO: check if we have any merged packets before closing
         // the input buffer
         return 1;
@@ -255,7 +250,7 @@ int stage_t::process_next_packet(void) {
     int early_termination = process_packet(packet);
 
     if(early_termination) {
-        // TODO: something special?
+        // TODO: terminate all packets in the chain
     }
 
     // close the output buffer
@@ -269,9 +264,11 @@ int stage_t::process_next_packet(void) {
 int stage_t::output(packet_t* packet, const tuple_t &tuple)
 {
 
-    critical_section_t cs(&packet->merge_mutex);
-    packet_list_t::iterator it = packet->merged_packets.begin();
-    cs.exit();
+    packet_list_t::iterator it;
+    {
+        critical_section_t cs(&packet->merge_mutex);
+        it = packet->merged_packets.begin();
+    }
 
     // send the tuple to the output buffers
     int failed = 1;
@@ -291,9 +288,10 @@ int stage_t::output(packet_t* packet, const tuple_t &tuple)
         // delete a finished packet?
         if(ret != 0) {
             set_not_mergeable(other);
-            critical_section_t cs(&packet->merge_mutex);
-            it = packet->merged_packets.erase(it);
-            cs.exit();
+            {
+                critical_section_t cs(&packet->merge_mutex);
+                it = packet->merged_packets.erase(it);
+            }
             
             if(packet == other)
                 set_not_mergeable(packet);

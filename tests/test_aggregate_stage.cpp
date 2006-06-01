@@ -107,8 +107,8 @@ int main() {
 						      "test aggregate",
 						      &output_buffer,
 						      &input_buffer,
-						      aggregator,
-						      filter);
+                                                      filter,
+						      aggregator);
 
   stage->enqueue(packet);
     

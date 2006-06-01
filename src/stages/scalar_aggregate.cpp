@@ -20,8 +20,7 @@ int scalar_aggregate_stage_t::process_packet(packet_t* p)
 {
     scalar_aggregate_packet_t* packet = (scalar_aggregate_packet_t*)p;
 
-    // automatically close the input buffer when this function exits
-    buffer_closer_t input = packet->input_buffer;
+    tuple_buffer_t *input = packet->input_buffer;
     tuple_aggregate_t* aggregate = packet->aggregate;
 
     // input buffer owns src
@@ -34,7 +33,7 @@ int scalar_aggregate_stage_t::process_packet(packet_t* p)
 
     input->init_buffer();
     
-    // we update the aggregate state by invoking select()
+    // send every tuple through the aggregate function
     TRACE(TRACE_TUPLE_FLOW, "Going to call get_tuple()\n");
     while(input->get_tuple(src)) {
 	TRACE(TRACE_TUPLE_FLOW, "get_tuple() returned a new tuple with size %d\n", src.size);

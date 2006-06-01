@@ -20,15 +20,14 @@ struct aggregate_packet_t : public packet_t {
   
     tuple_buffer_t *input_buffer;
     tuple_aggregate_t *aggregate;
-    bool mergeable;
     aggregate_packet_t(DbTxn *tid, char *packet_id,
 		       tuple_buffer_t *out_buffer,
 		       tuple_buffer_t *in_buffer,
-		       tuple_aggregate_t *agg,
-		       tuple_filter_t *filt)
+		       tuple_filter_t *filt,
+		       tuple_aggregate_t *agg)
 	: packet_t(tid, packet_id, out_buffer, filt),
 	 input_buffer(in_buffer),
-	 aggregate(agg), mergeable(true)
+	 aggregate(agg)
     {
     }
 
@@ -53,7 +52,7 @@ class aggregate_stage_t : public stage_t {
 
 
  protected:
-    int process_packet(packet_t *packet);
+    virtual int process_packet(packet_t *packet);
 
 };
 

@@ -6,26 +6,26 @@
 
 
 void tscan_packet_t::terminate() {
-    // TODO: not currently ever called by anyone
+    // do nothing -- no state to clean up
 }
 
 
-
-struct cursor_close_t {
-    typedef Dbc *Param;
-    Param _cursor;
-    cursor_close_t(Param cursor)
-        : _cursor(cursor)
+/**
+ * @brief A cursor guard that automatically closes the cursor when it
+ * goes out of scope.
+ */
+struct cursor_guard_t {
+    Db *_db;
+    Dbc *_cursor;
+    cursor_guard_t(Db *db, Dbc *cursor)
+        : _db(db), _cursor(cursor)
     {
     }
-    void init() {
-        // do nothing
-    }
-    void cleanup() {
+    
+    ~cursor_guard_t() {
         int tmp_ret = _cursor->close();
         if(tmp_ret) {
-            // TODO: figure out a clean way to do this
-            //            _cursor->dbp->err(tmp_ret, "ERROR closing cursor for tscan: ");
+            _db->err(tmp_ret, "ERROR closing cursor for fscan: ");
             QPIPE_PANIC();
         }
     }
@@ -52,6 +52,9 @@ int tscan_stage_t::process_packet(packet_t *p) {
         QPIPE_PANIC();
     }
     
+    // make sure the cursor gets closed properly
+    cursor_guard_t cursor_guard(db, dbcp);
+    
     // initialize data buffer for bulk reading. Must be aligned for
     // int accesses and a multiple of 1024 bytes long.
     // TODO: use actual pages somehow
@@ -64,8 +67,6 @@ int tscan_stage_t::process_packet(packet_t *p) {
     bulk_data.set_ulen(bufsize);
     bulk_data.set_flags(DB_DBT_USERMEM);
 
-    // make sure we don't forget to close the cursor
-    init_cleanup_t<cursor_close_t> guard(dbcp);
     while(1) {
         // request a group of tuples
         int tmp_ret = dbcp->get(&bulk_key, &bulk_data,
@@ -78,7 +79,7 @@ int tscan_stage_t::process_packet(packet_t *p) {
         DbMultipleKeyDataIterator it = bulk_data;
         while(it.next(key, data)) {
             if(!output(packet, data)) 
-                return guard.exit(1);
+                return 1;
         }
     }
 
@@ -88,5 +89,5 @@ int tscan_stage_t::process_packet(packet_t *p) {
         QPIPE_PANIC();
     }
 
-    return guard.exit(0);
+    return 0;
 }

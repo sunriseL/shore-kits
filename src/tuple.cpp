@@ -147,6 +147,7 @@ int tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
 
     pthread_mutex_init_wrapper(&init_lock, NULL);
     pthread_cond_init_wrapper(&init_notify, NULL);
+    return 0;
 }
 
 
@@ -178,12 +179,14 @@ tuple_buffer_t::~tuple_buffer_t() {
  */
 
 void tuple_buffer_t::init_buffer() {
+    
+    // * * * BEGIN CRITICAL SECTION * * *
     critical_section_t cs(&init_lock);
     
     // unblock waiting producer
     initialized = true;
     pthread_cond_signal_wrapper(&init_notify);
-    cs.exit();
+    // * * * END CRITICAL SECTION * * *
 }
 
 
@@ -206,14 +209,18 @@ void tuple_buffer_t::init_buffer() {
  */
 
 int tuple_buffer_t::wait_init(bool block) {
+    
+    // * * * BEGIN CRITICAL SECTION * * *
     critical_section_t cs(&init_lock);
 
     if(!block) 
-        return cs.exit(initialized? 0 : 1);
+        return initialized? 0 : 1;
+    
     while(!initialized && !page_buffer.stopped_reading())
         pthread_cond_wait_wrapper(&init_notify, &init_lock);
 
-    return cs.exit(page_buffer.stopped_reading()? -1 : 0);
+    return page_buffer.stopped_reading()? -1 : 0;
+    // * * * END CRITICAL SECTION * * *
 }
 
 

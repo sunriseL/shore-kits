@@ -71,7 +71,6 @@ void page_buffer_t::stop_reading() {
     pthread_cond_signal_wrapper(&write_notify);
     
     // * * * END CRITICAL SECTION * * *
-    cs.exit();
 }
 
 
@@ -99,7 +98,6 @@ void page_buffer_t::stop_writing() {
     pthread_cond_signal_wrapper(&read_notify);
         
     // * * * END CRITICAL SECTION * * *
-    cs.exit();
 }
 
 
@@ -152,7 +150,6 @@ page_t *page_buffer_t::read() {
         read_size_guess = size;
         
         // * * * END CRITICAL SECTION * * *
-        cs.exit();
     }
 
 
@@ -184,7 +181,6 @@ page_t *page_buffer_t::read() {
         pthread_cond_signal_wrapper(&write_notify);
         
         // * * * END CRITICAL SECTION * * *
-        cs.exit();
     }
     
     return page;
@@ -241,7 +237,6 @@ bool page_buffer_t::write(page_t *page) {
         write_size_guess = size;
 
         // * * * END CRITICAL SECTION * * *
-        cs.exit();
     }
 
 
@@ -277,7 +272,6 @@ bool page_buffer_t::write(page_t *page) {
         pthread_cond_signal_wrapper(&read_notify);
             
         // * * * END CRITICAL SECTION * * *
-        cs.exit();
     }
     
 
