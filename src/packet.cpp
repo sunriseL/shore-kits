@@ -3,6 +3,7 @@
 #include "thread.h"
 #include "stage.h"
 #include "trace/trace.h"
+#include "qpipe_panic.h"
 
 
 
@@ -15,22 +16,36 @@
  *  @brief packet_t constructor.
  */
 
-packet_t::packet_t(DbTxn* tid,
-		   char* pack_id,
-		   tuple_buffer_t* outbuf,
-		   tuple_filter_t* filt,
-                   bool mergeable)
+packet_t::packet_t(char* _packet_id,
+		   char* _packet_type,
+		   tuple_buffer_t* _output_buffer,
+		   tuple_filter_t* _filter,
+                   bool _mergeable)
+    : output_buffer(_output_buffer),
+      filter(_filter),
+      mergeable(_mergeable)
+    
 {
-  xact_id = tid;
-  packet_id = pack_id;
-  output_buffer = outbuf;
-  filter = filt;
-  this->mergeable = mergeable;
 
-  pthread_mutex_init_wrapper( &merge_mutex, NULL );
-  merged_packets.push_front(this);
-  
-  TRACE(TRACE_PACKET_FLOW, "Created a new packet with ID %s\n", packet_id);
+    // need to copy the strings since we don't own them
+    if ( asprintf( &packet_id, "%s", _packet_id) == -1 ) {
+	TRACE(TRACE_ALWAYS, "asprintf() failed on packet ID %s\n",
+	      packet_id);
+	QPIPE_PANIC();
+    }
+
+    if ( asprintf( &packet_type, "%s", _packet_type) == -1 ) {
+	TRACE(TRACE_ALWAYS, "asprintf() failed on packet type %s\n",
+	      packet_type);
+	QPIPE_PANIC();
+    }
+
+    pthread_mutex_init_wrapper( &merge_mutex, NULL );
+    merged_packets.push_front(this);
+    
+    TRACE(TRACE_PACKET_FLOW, "Created a new packet of type %s with ID %s\n",
+	  packet_type,
+	  packet_id);
 }
 
 

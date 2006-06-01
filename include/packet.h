@@ -38,45 +38,37 @@ class packet_t
 
 public:
 
-    DbTxn* xact_id;
-
-    // we will index all packets by a unique string ID
     char*  packet_id;
+    char*  packet_type;
 
     tuple_buffer_t* output_buffer;
     tuple_filter_t* filter;
   
-    // mutex to protect the chain of merged packets
-    pthread_mutex_t merge_mutex;
-    packet_list_t merged_packets;
-  
     // is this packet a candidate for merging?
     bool mergeable;
 
+    // mutex to protect the chain of merged packets
+    pthread_mutex_t merge_mutex;
+    packet_list_t   merged_packets;
+  
+
 public:
 
-    packet_t::packet_t(DbTxn* tid,
-                       char* pack_id,
-                       tuple_buffer_t* outbuf,
-                       tuple_filter_t* filt,
-                       bool mergeable=false);
+    packet_t::packet_t(char* _packet_id,
+		       char* _packet_type,
+                       tuple_buffer_t* _output_buffer,
+                       tuple_filter_t* _filter,
+                       bool _mergeable=false);
     virtual ~packet_t(void);
 
 
     /**
-     *  @brief Packet ID accessor.
-     */
-
-    char* get_packet_id(void) { return packet_id; }
-
-
-    /**
      *  @brief Check whether this packet can be merged with the
-     *  specified one. By default, packets are not mergeable.
+     *  specified one. By default, two packets are not mergeable.
      *
      *  @return false
      */  
-
+    
     virtual bool is_mergeable(packet_t *) { return false; }
 
 
