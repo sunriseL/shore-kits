@@ -2,12 +2,17 @@
 #ifndef __TSCAN_H
 #define __TSCAN_H
 
-#include "db_cxx.h"
-#include "tuple.h"
-#include "packet.h"
-#include "stage.h"
+# include "db_cxx.h"
+# include "tuple.h"
+# include "packet.h"
+# include "stage.h"
+# include "dispatcher/dispatcher.h"
+
 
 using namespace qpipe;
+
+# define TSCAN_STAGE_NAME  "TSCAN"
+# define TSCAN_PACKET_TYPE "TSCAN" 
 
 /**
  *@brief Packet definition for the Tscan stage
@@ -15,11 +20,11 @@ using namespace qpipe;
 struct tscan_packet_t : public packet_t {
     Db *input_table;
     bool mergeable;
-    tscan_packet_t(DbTxn *tid, char *packet_id,
+    tscan_packet_t(char *packet_id,
                    tuple_buffer_t *out_buffer,
                    tuple_filter_t *filt,
                    Db *in_table )
-        : packet_t(tid, packet_id, out_buffer, filt),
+        : packet_t(packet_id, TSCAN_PACKET_TYPE, out_buffer, filt),
           input_table(in_table),
           mergeable(true)
     {
@@ -35,9 +40,12 @@ struct tscan_packet_t : public packet_t {
 class tscan_stage_t : public stage_t {
 public:
     tscan_stage_t()
-        : stage_t("tscan stage")
+        : stage_t(TSCAN_STAGE_NAME)
     {
+      // register with the dispatcher
+      dispatcher_t::register_stage(TSCAN_PACKET_TYPE, this);
     }
+
 protected:
     virtual int process_packet(packet_t *packet);
 };

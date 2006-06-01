@@ -7,6 +7,9 @@
 
 using namespace qpipe;
 
+# define SORT_STAGE_NAME  "SORT"
+# define SORT_PACKET_TYPE "SORT"
+
 /**
  *@brief Packet definition for the sort stage
  */
@@ -14,12 +17,12 @@ struct sort_packet_t : public packet_t {
     tuple_buffer_t *input_buffer;
     tuple_comparator_t *compare;
 
-    sort_packet_t(DbTxn *tid, char *packet_id,
+    sort_packet_t(char *packet_id,
                   tuple_buffer_t *out_buffer,
                   tuple_buffer_t *in_buffer,
                   tuple_filter_t *filt,
                   tuple_comparator_t *cmp)
-	: packet_t(tid, packet_id, out_buffer, filt),
+	: packet_t(packet_id, SORT_PACKET_TYPE, out_buffer, filt),
           input_buffer(in_buffer),
           compare(cmp)
     {
@@ -35,8 +38,10 @@ struct sort_packet_t : public packet_t {
 class sort_stage_t : public stage_t {
 public:
     sort_stage_t()
-        : stage_t("SORT_STAGE")
+        : stage_t(SORT_STAGE_NAME)
     {
+	// register with the dispatcher
+	dispatcher_t::register_stage(SORT_PACKET_TYPE, this);
     }
 
 protected:

@@ -145,8 +145,7 @@ int main() {
 
     tuple_filter_t *filter = new q6_filter_t();
         
-    tscan_packet_t *packet = new tscan_packet_t(NULL,
-						"test tscan",
+    tscan_packet_t *packet = new tscan_packet_t("test tscan",
 						&output_buffer,
 						filter,
 						tpch_lineitem);

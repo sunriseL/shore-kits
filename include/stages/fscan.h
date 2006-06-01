@@ -15,6 +15,8 @@
 
 using namespace qpipe;
 
+# define FSCAN_STAGE_NAME  "FSCAN_STAGE"
+# define FSCAN_PACKET_TYPE "FSCAN"
 
 
 /**
@@ -27,13 +29,12 @@ struct fscan_packet_t : public packet_t {
   
   bool mergeable;
 
-  fscan_packet_t(DbTxn* tid,
-		 char*  packet_id,
+  fscan_packet_t(char*  packet_id,
 		 tuple_buffer_t* out_buffer,
 		 tuple_filter_t* filt,
 		 const char* filename,
 		 int tuple_size)
-    : packet_t(tid, packet_id, out_buffer, filt),
+    : packet_t(packet_id, FSCAN_PACKET_TYPE, out_buffer, filt),
        _filename(filename),
        _tuple_size(tuple_size)
   {
@@ -51,10 +52,10 @@ class fscan_stage_t : public stage_t {
 
 public:
   fscan_stage_t()
-    : stage_t("FSCAN_STAGE")
+    : stage_t(FSCAN_STAGE_NAME)
     {
 	// register with the dispatcher
-	dispatcher_t::register_stage("FSCAN", this);	
+	dispatcher_t::register_stage(FSCAN_PACKET_TYPE, this);	
     }
 
 protected:

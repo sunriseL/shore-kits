@@ -12,6 +12,7 @@
 
 using namespace qpipe;
 
+# define AGGREGATE_PACKET_TYPE "AGGREGATE"
 
 
 /**
@@ -22,12 +23,12 @@ struct aggregate_packet_t : public packet_t {
   
     tuple_buffer_t *input_buffer;
     tuple_aggregate_t *aggregate;
-    aggregate_packet_t(DbTxn *tid, char *packet_id,
+    aggregate_packet_t(char *packet_id,
 		       tuple_buffer_t *out_buffer,
 		       tuple_buffer_t *in_buffer,
 		       tuple_filter_t *filt,
 		       tuple_aggregate_t *agg)
-	: packet_t(tid, packet_id, out_buffer, filt),
+	: packet_t(packet_id, AGGREGATE_PACKET_TYPE, out_buffer, filt),
 	 input_buffer(in_buffer),
 	 aggregate(agg)
     {
@@ -49,7 +50,7 @@ class aggregate_stage_t : public stage_t {
 	: stage_t("AGGREGATE_STAGE")
 	{
 	    // register with the dispatcher
-	    dispatcher_t::register_stage("AGGREGATE", this);
+	    dispatcher_t::register_stage(AGGREGATE_PACKET_TYPE, this);
 	}
 
     ~aggregate_stage_t() { }

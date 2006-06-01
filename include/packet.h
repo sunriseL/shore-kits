@@ -59,6 +59,7 @@ public:
                        tuple_buffer_t* _output_buffer,
                        tuple_filter_t* _filter,
                        bool _mergeable=false);
+
     virtual ~packet_t(void);
 
 

@@ -103,8 +103,8 @@ int main() {
   tuple_buffer_t  output_buffer(sizeof(int));
   tuple_filter_t* filter = new tuple_filter_t();
   count_aggregate_t*  aggregator = new count_aggregate_t();
-  aggregate_packet_t* packet = new aggregate_packet_t(NULL,
-						      "test aggregate",
+
+  aggregate_packet_t* packet = new aggregate_packet_t("test aggregate",
 						      &output_buffer,
 						      &input_buffer,
                                                       filter,

@@ -17,6 +17,10 @@
 
 using namespace qpipe;
 
+# define HASH_JOIN_STAGE_NAME  "HASH_JOIN"
+# define HASH_JOIN_PACKET_TYPE "HASH_JOIN"
+
+
 /********************
  * hash_join_packet *
  ********************/
@@ -45,8 +49,7 @@ public:
   int count_left;
   int count_right;
   
-  hash_join_packet_t(DbTxn* tid,
-                     char* packet_id,
+  hash_join_packet_t(char* packet_id,
                      tuple_buffer_t* out_buffer,
                      tuple_buffer_t* in_buffer1,
                      tuple_buffer_t* in_buffer2,

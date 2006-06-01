@@ -63,7 +63,7 @@ private:
   int count;
     
 public:
-  
+
   count_aggregate_t() {
     count = 0;
   }
@@ -85,8 +85,9 @@ int main() {
   thread_init();
 
   scalar_aggregate_stage_t* stage = new scalar_aggregate_stage_t();
-  tester_thread_t* aggregate_thread =
+  tester_thread_t* aggregate_thread = 
     new tester_thread_t(drive_stage, stage, "AGGREGATE_THREAD");
+
   if ( thread_create( NULL, aggregate_thread ) ) {
     TRACE(TRACE_ALWAYS, "thread_create() failed\n");
     QPIPE_PANIC();
@@ -97,6 +98,7 @@ int main() {
   tuple_buffer_t input_buffer(sizeof(int));
   tester_thread_t* writer_thread =
     new tester_thread_t(write_tuples, &input_buffer, "WRITER_THREAD");
+
   if ( thread_create( NULL, writer_thread ) ) {
     TRACE(TRACE_ALWAYS, "thread_create() failed\n");
     QPIPE_PANIC();
@@ -106,10 +108,10 @@ int main() {
   // aggregate single count result (single int)
   tuple_buffer_t  output_buffer(sizeof(int));
   tuple_filter_t* filter = new tuple_filter_t();
-  count_aggregate_t*  aggregator = new count_aggregate_t();
+  count_aggregate_t* aggregator = new count_aggregate_t();
+
   scalar_aggregate_packet_t* packet =
-    new scalar_aggregate_packet_t(NULL,
-				  "COUNT_AGGREGATE_PACKET",
+    new scalar_aggregate_packet_t("COUNT_AGGREGATE_PACKET",
 				  &output_buffer,
 				  &input_buffer,
 				  aggregator,

@@ -12,6 +12,8 @@
 
 using namespace qpipe;
 
+# define SCALAR_AGGREGATE_STAGE_NAME  "SCALAR_AGGREGATE"
+# define SCALAR_AGGREGATE_PACKET_TYPE "SCALAR_AGGREGATE"
 
 
 /**
@@ -28,13 +30,12 @@ struct scalar_aggregate_packet_t : public packet_t {
   
   bool mergeable;
 
-  scalar_aggregate_packet_t(DbTxn*             tid,
-			    char*              packet_id,
+  scalar_aggregate_packet_t(char*              packet_id,
 			    tuple_buffer_t*    out_buffer,
 			    tuple_buffer_t*    in_buffer,
 			    tuple_aggregate_t* agg,
 			    tuple_filter_t*    filt)
-    : packet_t(tid, packet_id, out_buffer, filt),
+    : packet_t(packet_id, SCALAR_AGGREGATE_PACKET_TYPE, out_buffer, filt),
        input_buffer(in_buffer),
        aggregate(agg),
        mergeable(true)
@@ -57,10 +58,10 @@ class scalar_aggregate_stage_t : public stage_t {
 
 public:
   scalar_aggregate_stage_t()
-    : stage_t("SCALAR_AGGREGATE_STAGE")
+    : stage_t(SCALAR_AGGREGATE_STAGE_NAME)
     {
 	// register with the dispatcher
-	dispatcher_t::register_stage("SCALAR_AGGREGATE", this);
+	dispatcher_t::register_stage(SCALAR_AGGREGATE_PACKET_TYPE, this);
     }
 
   ~scalar_aggregate_stage_t() { }

@@ -47,7 +47,7 @@ int tscan_stage_t::process_packet(packet_t *p) {
     Db *db = packet->input_table;
 
     // try to open a cursor (not thread safe)
-    int tmp_ret = db->cursor(packet->xact_id, &dbcp, 0);
+    int tmp_ret = db->cursor(NULL, &dbcp, 0);
     if(tmp_ret != 0) {
         db->err(tmp_ret, "ERROR opening cursor for tscan: ");
         QPIPE_PANIC();
