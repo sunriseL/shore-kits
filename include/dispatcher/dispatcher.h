@@ -53,8 +53,8 @@ protected:
     // methods
     int do_register_stage(const char* packet_type, stage_t* stage);
     
+    static dispatcher_t* _instance;
     static dispatcher_t* instance() {
-	static dispatcher_t* _instance = NULL;
     	if ( _instance == NULL ) {
 	    _instance = new dispatcher_t();
 	}

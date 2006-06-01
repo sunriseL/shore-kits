@@ -9,10 +9,20 @@
 # include "dispatcher/dispatcher.h"
 
 
+
 using namespace qpipe;
 
-# define TSCAN_STAGE_NAME  "TSCAN"
-# define TSCAN_PACKET_TYPE "TSCAN" 
+
+
+/* exported constants */
+
+#define TSCAN_STAGE_NAME  "TSCAN"
+#define TSCAN_PACKET_TYPE "TSCAN" 
+
+
+
+/* exported functions */
+
 
 /**
  *@brief Packet definition for the Tscan stage
@@ -33,6 +43,8 @@ struct tscan_packet_t : public packet_t {
     virtual void terminate();
 };
 
+
+
 /**
  *  @brief Table scan stage that reads tuples from the storage manager.
  */
@@ -49,5 +61,7 @@ public:
 protected:
     virtual int process_packet(packet_t *packet);
 };
+
+
 
 #endif

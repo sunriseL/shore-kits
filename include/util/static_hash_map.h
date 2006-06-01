@@ -20,6 +20,7 @@
 #ifndef _STATIC_HASH_MAP_H
 #define _STATIC_HASH_MAP_H
 
+#include <sys/types.h>
 
 
 
@@ -52,7 +53,7 @@ typedef struct static_hash_node_s* static_hash_node_t;
    also treat it as const. Using const also prevents us from allowing
    functors that modify payloads passed to map. */
 
-void static_hash_node_init( static_hash_node_t node, void* key, void* value );
+void static_hash_node_init( static_hash_node_t node, const void* key, const void* value );
 
 void static_hash_map_init(static_hash_map_t ht,
 			  struct static_hash_node_s* table_entries,
@@ -61,16 +62,17 @@ void static_hash_map_init(static_hash_map_t ht,
 			  int    (*comparator) (const void* key1, const void* key2) );
 
 void static_hash_map_insert(static_hash_map_t ht,
-			    void* key, void* value,
+			    const void* key,
+			    const void* value,
 			    static_hash_node_t node);
 
 int static_hash_map_find(static_hash_map_t ht,
-			 void* key,
+			 const void* key,
 			 void** value,
 			 static_hash_node_t* node);
 
 int static_hash_map_remove(static_hash_map_t ht,
-			   void* key,
+			   const void* key,
 			   void** value,
 			   static_hash_node_t* node);
 

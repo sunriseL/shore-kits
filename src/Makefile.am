@@ -37,8 +37,8 @@ libqpipe_a_SOURCES = \
    stage.cpp \
    $(STAGES) \
    $(TRACE) \
-   $(DISPATCHER) \
-   $(UTIL)
+   $(UTIL) \
+   $(DISPATCHER)
 
 # define programs here
 #bin_PROGRAMS = test_hash_join_stage

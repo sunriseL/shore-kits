@@ -18,7 +18,6 @@
  *  @bug None known.
  */
 #include <cstdlib>                        /* for NULL */
-#include <sys/types.h>                    /* for size_t */
 #include "util/static_hash_map.h"         /* for prototypes */
 #include "util/static_hash_map_struct.h"  /* for prototypes */
 
@@ -33,7 +32,7 @@ static void* static_hash_node_get_value(static_hash_node_t node);
 static static_hash_node_t static_hash_node_get_next(static_hash_node_t node);
 static void static_hash_node_insert_after(static_hash_node_t insert_after_this,
 					  static_hash_node_t node_to_insert);
-void static_hash_node_cut(static_hash_node_t node);
+static void static_hash_node_cut(static_hash_node_t node);
 
 
 
@@ -42,7 +41,22 @@ void static_hash_node_cut(static_hash_node_t node);
 
 
 /** 
- *  @brief Hash table initializer;
+ *  @brief Hash table initializer
+ *
+ *  @param ht The hash table to initialize.
+ *
+ *  @param table_entries The array of hash nodes to start the table
+ *  with. The static hash map deals with collisions by chaining other
+ *  nodes off these initial buckets.
+ *
+ *  @param table_size The number of hash nodes in table_entries.
+ *
+ *  @param hf The hash function to be used by this table. The table
+ *  will apply this function to keys to determine a table index.
+ *
+ *  @param comparator The comparator used to compare two keys in the
+ *  table. Really only used as an equality comparator. Should return 0
+ *  when the two parameters are equal and nonzero otherwise.
  *
  *  @return void
  */
@@ -50,7 +64,7 @@ void static_hash_map_init(static_hash_map_t ht,
 			  struct static_hash_node_s* table_entries,
 			  size_t table_size,
 			  size_t (*hf) (const void* key),
-			  int   (*comparator) (const void* key1, const void* key2) )
+			  int    (*comparator) (const void* key1, const void* key2) )
 {
   ht->table_entries = table_entries;
   ht->table_size = table_size;
@@ -86,14 +100,15 @@ void static_hash_map_init(static_hash_map_t ht,
  *  @return void
  */
 void static_hash_map_insert(static_hash_map_t ht,
-			    void* key, void* value,
+			    const void* key,
+			    const void* value,
 			    static_hash_node_t node)
 {
   unsigned long hash_code = ht->hf(key);
   unsigned long hash_index = hash_code % ht->table_size;
   
   static_hash_node_init( node, key, value );
-    
+  
   /* design design: assume that inserted data will be probed soon */
   /* insert done at the beginning of the chain */
   static_hash_node_insert_after( &ht->table_entries[hash_index], node );
@@ -108,17 +123,19 @@ void static_hash_map_insert(static_hash_map_t ht,
  *
  *  @param ht The hash table.
  *
- *  @param key The key of the entry we will be inserting.
+ *  @param key The key of the entry we ware searching for.
  *
- *  @param value The value of the entry we will be inserting.
+ *  @param value If not NULL and the specified entry is found, the
+ *  value of the key-value pair will be stored here.
  *
- *  @param node The node to use to store this entry.
+ *  @param node If not NULL and the specified entry is found, the node
+ *  used to store the key-value pair will be stored here.
  *
  *  @return 0 if the specified element is found. Negative value
  *  otherwise.
  */
 int static_hash_map_find(static_hash_map_t ht,
-			 void* key,
+			 const void* key,
 			 void** value,
 			 static_hash_node_t* node)
 {
@@ -169,15 +186,17 @@ int static_hash_map_find(static_hash_map_t ht,
  *
  *  @param key The key of the entry we will be removing.
  *
- *  @param value The value of the entry we will be removing.
+ *  @param value If not NULL and the specified entry is removed, the
+ *  value of the key-value pair will be stored here.
  *
- *  @param node The node to use to store this entry.
+ *  @param node If not NULL and the specified entry is removed, the
+ *  node used to store the key-value pair will be stored here.
  *
  *  @return 0 on successful remove. Negative value if the specified
  *  element is not found.
  */
 int static_hash_map_remove(static_hash_map_t ht,
-			   void* key,
+			   const void* key,
 			   void** value,
 			   static_hash_node_t* node)
 {
@@ -243,7 +262,7 @@ void static_hash_map_cut(static_hash_map_t ht, static_hash_node_t node)
  *
  *  @return void
  */
-void static_hash_node_init(static_hash_node_t node, void* key, void* value)
+void static_hash_node_init(static_hash_node_t node, const void* key, const void* value)
 {
   node->next = node->prev = node;
   node->key = key;
@@ -263,7 +282,7 @@ void static_hash_node_init(static_hash_node_t node, void* key, void* value)
  */
 static void* static_hash_node_get_key(static_hash_node_t node)
 {
-  return node->key;
+  return (void*)node->key;
 }
 
 
@@ -278,7 +297,7 @@ static void* static_hash_node_get_key(static_hash_node_t node)
  */
 static void* static_hash_node_get_value(static_hash_node_t node)
 {
-  return node->value;
+  return (void*)node->value;
 }
 
 
@@ -339,7 +358,7 @@ static void static_hash_node_insert_after(static_hash_node_t insert_after_this,
  *
  *  @return 0 on successful remove. -1 if called on a singleton.
  */
-void static_hash_node_cut(static_hash_node_t node)
+static void static_hash_node_cut(static_hash_node_t node)
 {
   /* patch the list */
   node->next->prev = node->prev;

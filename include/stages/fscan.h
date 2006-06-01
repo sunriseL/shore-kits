@@ -15,8 +15,16 @@
 
 using namespace qpipe;
 
-# define FSCAN_STAGE_NAME  "FSCAN_STAGE"
-# define FSCAN_PACKET_TYPE "FSCAN"
+
+
+/* exported constants */
+
+#define FSCAN_STAGE_NAME  "FSCAN_STAGE"
+#define FSCAN_PACKET_TYPE "FSCAN"
+
+
+
+/* exported functions */
 
 
 /**

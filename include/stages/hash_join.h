@@ -7,18 +7,18 @@
 */
 
 
-# ifndef __HASH_JOIN_STAGE_H
-# define __HASH_JOIN_STAGE_H
+#ifndef __HASH_JOIN_STAGE_H
+#define __HASH_JOIN_STAGE_H
 
-# include "thread.h"
-# include <ext/hash_set>
-# include "stage.h"
+#include "thread.h"
+#include <ext/hash_set>
+#include "stage.h"
 
 
 using namespace qpipe;
 
-# define HASH_JOIN_STAGE_NAME  "HASH_JOIN"
-# define HASH_JOIN_PACKET_TYPE "HASH_JOIN"
+#define HASH_JOIN_STAGE_NAME  "HASH_JOIN"
+#define HASH_JOIN_PACKET_TYPE "HASH_JOIN"
 
 
 /********************

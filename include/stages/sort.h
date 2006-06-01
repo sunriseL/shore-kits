@@ -5,10 +5,21 @@
 
 #include "stage.h"
 
+
+
 using namespace qpipe;
 
-# define SORT_STAGE_NAME  "SORT"
-# define SORT_PACKET_TYPE "SORT"
+
+
+/* exported constants */
+
+#define SORT_STAGE_NAME  "SORT"
+#define SORT_PACKET_TYPE "SORT"
+
+
+
+/* exported functions */
+
 
 /**
  *@brief Packet definition for the sort stage
@@ -31,6 +42,8 @@ struct sort_packet_t : public packet_t {
     virtual void terminate();
 };
 
+
+
 /**
  * @brief Sort stage that partitions the input into sorted runs and
  * merges them into a single output run.
@@ -47,3 +60,7 @@ public:
 protected:
     virtual int process_packet(packet_t *packet);
 };
+
+
+
+#endif

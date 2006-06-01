@@ -37,7 +37,25 @@ dispatcher_t::~dispatcher_t() {
 
 
 
+/**
+ *  @brief THIS FUNCTION IS NOT THREAD-SAFE. It should not have to be
+ *  since stages should register themselves in their constructors and
+ *  their constructors should execute in the context of the root
+ *  thread.
+ */
 int dispatcher_t::do_register_stage(const char* packet_type, stage_t* stage) {
+
+  
+  // We eventually want multiple stages willing to perform SORT's. But
+  // then we need policy/cost model to determine which SORT stage to
+  // use when. For now, restrict to one stage per type.
+  if ( !static_hash_map_find( &stage_directory, packet_type, NULL, NULL ) ) {
+    TRACE(TRACE_ALWAYS, "Only one stage per type currenrly supported\n");
+    TRACE(TRACE_ALWAYS, "Trying to register duplicate stage for type %s\n",
+	  packet_type);
+    QPIPE_PANIC();
+  }
+	  
 
   // allocate hash node and copy of key string
   static_hash_node_t node = (static_hash_node_t)malloc(sizeof(*node));
@@ -52,12 +70,15 @@ int dispatcher_t::do_register_stage(const char* packet_type, stage_t* stage) {
     free(node);
     return -1;
   }
+
   
   // add to hash map
   static_hash_map_insert( &stage_directory, ptcopy, stage, node );
   return 0;
 }
 
+
+dispatcher_t* dispatcher_t::_instance = NULL;
 
 int dispatcher_t::register_stage(const char* packet_type, stage_t* stage) {
   return instance()->do_register_stage(packet_type, stage);

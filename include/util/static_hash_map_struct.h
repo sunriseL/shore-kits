@@ -19,6 +19,7 @@
 #ifndef _STATIC_HASH_MAP_STRUCT_H
 #define _STATIC_HASH_MAP_STRUCT_H
 
+#include <sys/types.h>
 
 
 
@@ -36,7 +37,7 @@
 struct static_hash_map_s
 {
   struct static_hash_node_s* table_entries;
-  unsigned long table_size;
+  size_t table_size;
   
   size_t (*hf) (const void* key);
   int    (*comparator) (const void* key1, const void* key2);
@@ -63,10 +64,10 @@ struct static_hash_node_s
   struct static_hash_node_s* next;
 
   /** This entry's key. */
-  void* key;
+  const void* key;
 
   /** This entry's data. */
-  void* value;
+  const void* value;
 };
 
 

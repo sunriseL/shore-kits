@@ -5,10 +5,21 @@
 
 #include "stage.h"
 
+
+
 using namespace qpipe;
 
-# define FDUMP_STAGE_NAME  "FDUMP"
-# define FDUMP_PACKET_NAME "FDUMP"
+
+
+/* exported constants */
+
+#define FDUMP_STAGE_NAME  "FDUMP_STAGE"
+#define FDUMP_PACKET_NAME "FDUMP"
+
+
+
+/* exported functions */
+
 
 /**
  *@brief Packet definition for the sort stage
@@ -32,6 +43,7 @@ struct fdump_packet_t : public packet_t {
 };
 
 
+
 /**
  * @brief Sort stage that partitions the input into sorted runs and
  * merges them into a single output run.
@@ -49,3 +61,7 @@ public:
 protected:
     virtual int process_packet(packet_t *packet);
 };
+
+
+
+#endif

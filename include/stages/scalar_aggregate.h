@@ -12,8 +12,16 @@
 
 using namespace qpipe;
 
-# define SCALAR_AGGREGATE_STAGE_NAME  "SCALAR_AGGREGATE"
-# define SCALAR_AGGREGATE_PACKET_TYPE "SCALAR_AGGREGATE"
+
+
+/* exported constants */
+
+#define SCALAR_AGGREGATE_STAGE_NAME  "SCALAR_AGGREGATE_STAGE"
+#define SCALAR_AGGREGATE_PACKET_TYPE "SCALAR_AGGREGATE"
+
+
+
+/* exported functions */
 
 
 /**
