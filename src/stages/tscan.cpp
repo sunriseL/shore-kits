@@ -1,11 +1,11 @@
 /* -*- mode:C++; c-basic-offset:4 -*- */
 
-#include "stages/fscan.h"
+#include "stages/tscan.h"
 #include "qpipe_panic.h"
 
 
 
-void fscan_packet_t::terminate() {
+void tscan_packet_t::terminate() {
     // TODO: not currently ever called by anyone
 }
 
@@ -25,7 +25,7 @@ struct cursor_close_t {
         int tmp_ret = _cursor->close();
         if(tmp_ret) {
             // TODO: figure out a clean way to do this
-            //            _cursor->dbp->err(tmp_ret, "ERROR closing cursor for fscan: ");
+            //            _cursor->dbp->err(tmp_ret, "ERROR closing cursor for tscan: ");
             QPIPE_PANIC();
         }
     }
@@ -38,9 +38,9 @@ struct cursor_close_t {
  *           for the table scan stage.
  */
 
-int fscan_stage_t::process_packet(packet_t *p) {
+int tscan_stage_t::process_packet(packet_t *p) {
 
-    fscan_packet_t *packet = (fscan_packet_t *)p;
+    tscan_packet_t *packet = (tscan_packet_t *)p;
 
     Dbc *dbcp;
     Db *db = packet->input_table;
@@ -48,7 +48,7 @@ int fscan_stage_t::process_packet(packet_t *p) {
     // try to open a cursor (not thread safe)
     int tmp_ret = db->cursor(packet->xact_id, &dbcp, 0);
     if(tmp_ret != 0) {
-        db->err(tmp_ret, "ERROR opening cursor for fscan: ");
+        db->err(tmp_ret, "ERROR opening cursor for tscan: ");
         QPIPE_PANIC();
     }
     
@@ -84,7 +84,7 @@ int fscan_stage_t::process_packet(packet_t *p) {
 
     // test for read errors
     if(tmp_ret != DB_NOTFOUND) {
-        db->err(tmp_ret, "ERROR accessing cursor for fscan: ");
+        db->err(tmp_ret, "ERROR accessing cursor for tscan: ");
         QPIPE_PANIC();
     }
 

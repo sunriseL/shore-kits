@@ -270,7 +270,8 @@ public:
 
     /**
      *  @brief Fill this page with tuples read from the specified
-     *  file.
+     *  file. If this page already contains tuples, we will only
+     *  modify the remainder of the page.
      *
      *  @param file The file to read from.
      *
@@ -278,12 +279,19 @@ public:
      */
 
     int fread(FILE *file) {
+
         char *base = &_data[_end_offset];
-        int max = capacity() - tuple_size();
-        int count = ::fread(base, tuple_size(), max, file);
+	
+	// If this page is not empty, we want to leave its tuples
+	// untouched. We will fill the remainder of the page.
+        size_t max = capacity() - tuple_count();
+
+        size_t count = ::fread(base, tuple_size(), max, file);
+
         _end_offset += count * tuple_size();
         _tuple_count += count;
-        return count;
+
+	return count;
     }
 
 
@@ -294,7 +302,7 @@ public:
      *
      *  @return The number of tuples written.
      */
-
+    
     int fwrite(FILE *file) {
         return ::fwrite(_data, tuple_size(), tuple_count(), file);
     }

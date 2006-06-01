@@ -1,6 +1,6 @@
 // -*- mode:C++ c-basic-offset:4 -*-
-#ifndef __FSCAN_H
-#define __FSCAN_H
+#ifndef __TSCAN_H
+#define __TSCAN_H
 
 #include "db_cxx.h"
 #include "tuple.h"
@@ -10,12 +10,12 @@
 using namespace qpipe;
 
 /**
- *@brief Packet definition for the FScan stage
+ *@brief Packet definition for the Tscan stage
  */
-struct fscan_packet_t : public packet_t {
+struct tscan_packet_t : public packet_t {
     Db *input_table;
     bool mergeable;
-    fscan_packet_t(DbTxn *tid, char *packet_id,
+    tscan_packet_t(DbTxn *tid, char *packet_id,
                    tuple_buffer_t *out_buffer,
                    tuple_filter_t *filt,
                    Db *in_table
@@ -32,10 +32,10 @@ struct fscan_packet_t : public packet_t {
 /**
  *@brief File scan stage that reads tuples from the storage manager.
  */
-class fscan_stage_t : public stage_t {
+class tscan_stage_t : public stage_t {
 public:
-    fscan_stage_t()
-        : stage_t("fscan stage")
+    tscan_stage_t()
+        : stage_t("tscan stage")
     {
     }
 protected:

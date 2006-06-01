@@ -78,7 +78,9 @@ stage_t::~stage_t(void) {
 
 packet_t* stage_t::dequeue(void) {
 
-
+    TRACE(TRACE_PACKET_FLOW, "Trying to dequeue packet from stage %s\n",
+	  get_name());
+  
     // * * * BEGIN CRITICAL SECTION * * *
     pthread_mutex_lock_wrapper(&stage_lock);
   
@@ -94,9 +96,9 @@ packet_t* stage_t::dequeue(void) {
     // * * * END CRITICAL SECTION * * *
 
 
-    TRACE(TRACE_PACKET_FLOW, "Stage %s dequeued packet %s\n",
-	  get_name(),
-	  p->packet_id);
+    TRACE(TRACE_PACKET_FLOW, "Dequeued packet %s from stage %s\n",
+	  p->packet_id,
+	  get_name());
   
     return p;
 }
