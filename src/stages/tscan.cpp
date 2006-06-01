@@ -6,7 +6,7 @@
 
 
 void tscan_packet_t::terminate() {
-    // do nothing -- no state to clean up
+    // TODO: not currently ever called by anyone
 }
 
 
@@ -25,6 +25,7 @@ struct cursor_guard_t {
     ~cursor_guard_t() {
         int tmp_ret = _cursor->close();
         if(tmp_ret) {
+
             _db->err(tmp_ret, "ERROR closing cursor for fscan: ");
             QPIPE_PANIC();
         }
@@ -60,12 +61,15 @@ int tscan_stage_t::process_packet(packet_t *p) {
     // TODO: use actual pages somehow
     int bufsize = 10*4096/sizeof(int);
     int* buffer = new int[bufsize];
+
+    // initiates and sets the key and data variables for the bulk reading
     Dbt bulk_key, bulk_data;
     memset(&bulk_key, 0, sizeof(bulk_key));
     memset(&bulk_data, 0, sizeof(bulk_data));
     bulk_data.set_data(buffer);
     bulk_data.set_ulen(bufsize);
     bulk_data.set_flags(DB_DBT_USERMEM);
+
 
     while(1) {
         // request a group of tuples

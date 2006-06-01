@@ -1,4 +1,4 @@
-// -*- mode:C++; c-basic-offset:4 -*-
+// -*- mode:C++ c-basic-offset:4 -*-
 #ifndef __TSCAN_H
 #define __TSCAN_H
 
@@ -18,8 +18,7 @@ struct tscan_packet_t : public packet_t {
     tscan_packet_t(DbTxn *tid, char *packet_id,
                    tuple_buffer_t *out_buffer,
                    tuple_filter_t *filt,
-                   Db *in_table
-                   )
+                   Db *in_table )
         : packet_t(tid, packet_id, out_buffer, filt),
           input_table(in_table),
           mergeable(true)
@@ -30,8 +29,9 @@ struct tscan_packet_t : public packet_t {
 };
 
 /**
- *@brief File scan stage that reads tuples from the storage manager.
+ *  @brief Table scan stage that reads tuples from the storage manager.
  */
+
 class tscan_stage_t : public stage_t {
 public:
     tscan_stage_t()
