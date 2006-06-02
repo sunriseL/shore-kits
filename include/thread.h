@@ -79,14 +79,22 @@ void pthread_cond_wait_wrapper(pthread_cond_t* cond,
  */
 
 struct critical_section_t {
+    bool _active;
     pthread_mutex_t *_mutex;
     critical_section_t(pthread_mutex_t *mutex)
         : _mutex(mutex)
     {
         pthread_mutex_lock_wrapper(_mutex);
+        _active = true;
+    }
+    void exit() {
+        assert(_active);
+        _active = false;
+        pthread_mutex_unlock_wrapper(_mutex);
     }
     ~critical_section_t() {
-        pthread_mutex_unlock_wrapper(_mutex);
+        if(_active)
+            exit();
     }
 };
 

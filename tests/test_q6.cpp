@@ -140,7 +140,10 @@ public:
   }
   
   bool aggregate(tuple_t &, const tuple_t &) {
-    count++;
+      if(count++ % 1000 == 0) {
+        printf(".");
+        fflush(stdout);
+      }
     return false;
   }
 
@@ -177,9 +180,6 @@ int main() {
 	QPIPE_PANIC();
     }
 
-
-    pthread_mutex_t mutex;
-    pthread_mutex_init_wrapper(&mutex, NULL);
 
     Db* tpch_lineitem = NULL;
     DbEnv* dbenv = NULL;
@@ -261,7 +261,6 @@ int main() {
     
     tuple_t output;
     q6_agg_output_buffer.init_buffer();
-    q6_tscan_output_buffer.init_buffer();
 
     while(q6_agg_output_buffer.get_tuple(output))
       TRACE(TRACE_ALWAYS, "*** Q6 Count: %d ***\n", *(int*)output.data);
@@ -283,7 +282,5 @@ int main() {
 	TRACE(TRACE_ALWAYS, "std::exception\n");
     }
 
-
-    pthread_mutex_destroy_wrapper(&mutex);
     return 0;
 }

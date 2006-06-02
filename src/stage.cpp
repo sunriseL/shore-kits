@@ -218,9 +218,9 @@ void stage_t::set_not_mergeable(packet_t *packet) {
 int stage_t::process_next_packet(void) {
 
     // wait for a packet to become available
-    pthread_mutex_lock_wrapper(&stage_lock);
+    critical_section_t cs(&stage_lock);
     pointer_guard_t<packet_t> packet = stage_queue_dequeue();
-    pthread_mutex_lock_wrapper(&stage_lock);
+    cs.exit();
 
 
     // error checking

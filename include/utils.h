@@ -13,15 +13,16 @@ using qpipe::tuple_buffer_t;
 
 /**
  *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
- *  that the buffer is closed when wrapper goes out of scope. By using
- *  this wrapper, we can avoid duplicating close() code at every exit
- *  point.
+ *  that the buffer is initialized, then close it when this wrapper
+ *  goes out of scope. By using this wrapper, we can avoid duplicating
+ *  close() code at every exit point.
  */
 struct buffer_guard_t {
     tuple_buffer_t *buffer;
     buffer_guard_t(tuple_buffer_t *buf)
         : buffer(buf)
     {
+        buffer->init_buffer();
     }
   
     ~buffer_guard_t() {
