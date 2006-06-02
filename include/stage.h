@@ -62,12 +62,21 @@ protected:
     pthread_mutex_t stage_lock;
     pthread_cond_t  stage_queue_packet_available;
     
-    // packet queue
+    // stage queue
     packet_list_t stage_queue;
     
     // set of packets currently being processed
     packet_list_t merge_candidates;
     
+    // Currently, all known forms of work sharing can be implemented
+    // with an integer "mark" that new packets can record as they
+    // merge with an existing packet. When the root packet is
+    // completely processed (i.e. when a file is completely read),
+    // incomplete packets are re-enqued. They are only processed until
+    // the new process_packet() function handling them hits their
+    // recorded mark. They can then be split
+
+
 
     /* Each stage must override this method with the functionality of
        that stage. */
