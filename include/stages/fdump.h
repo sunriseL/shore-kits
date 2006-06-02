@@ -9,7 +9,7 @@
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
-#include "dispatcher/dispatcher.h"
+#include "dispatcher.h"
 
 
 
