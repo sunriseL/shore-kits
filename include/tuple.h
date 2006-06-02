@@ -184,6 +184,15 @@ public:
         return new (page) tuple_page_t(tuple_size);
     }
 
+    
+    /**
+     * @brief Calculates the capacity of a page given the (page_size)
+     * and (tuple_size).
+     */
+    
+    static size_t capacity(size_t page_size, size_t tuple_size) {
+        return (page_size - sizeof(tuple_page_t))/tuple_size;
+    }
 
     /**
      *  @brief Returns the size of the tuples stored in this page.
@@ -211,7 +220,7 @@ public:
      */
 
     size_t capacity() const {
-        return (page_size() - sizeof(tuple_page_t))/tuple_size();
+        return capacity(page_size(), tuple_size());
     }
 
 
@@ -480,7 +489,7 @@ class tuple_buffer_t {
 private:
 
     page_buffer_t page_buffer;
-    size_t page_size;
+    size_t _page_size;
     
     pthread_mutex_t init_lock;
     pthread_cond_t  init_notify;
@@ -500,6 +509,9 @@ public:
     int unique_id;
     size_t tuple_size;
 
+    size_t page_size() const {
+        return _page_size;
+    }
 
     /**
      *  @brief Insert a tuple into this buffer. If the buffer is full

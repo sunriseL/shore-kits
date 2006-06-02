@@ -18,32 +18,6 @@ class stage_t;
 
 
 
-/**
- *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
- *  that the buffer is closed when wrapper goes out of scope. By using
- *  this wrapper, we can avoid duplicating close() code at every exit
- *  point.
- */
-
-struct buffer_closer_t {
-
-    tuple_buffer_t *buffer;
-    buffer_closer_t(tuple_buffer_t *buf)
-        : buffer(buf)
-    {
-    }
-  
-    ~buffer_closer_t() {
-        buffer->close();
-    }
-
-    tuple_buffer_t *operator->() {
-        return buffer;
-    }
-
-};
-
-
 
 /**
  *  @brief A QPIPE stage is a queue of packets (work that must be

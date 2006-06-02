@@ -1,4 +1,4 @@
-/* -*- mode:C++ c-basic-offset:4 -*- */
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 #ifndef __SCALAR_AGGREGATE_H
 #define __SCALAR_AGGREGATE_H
@@ -6,7 +6,7 @@
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
-#include "dispatcher/dispatcher.h"
+#include "dispatcher.h"
 
 
 

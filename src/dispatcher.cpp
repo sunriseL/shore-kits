@@ -1,5 +1,5 @@
 
-#include "dispatcher/dispatcher.h"
+#include "dispatcher.h"
 #include "util/static_hash_map.h"
 #include "util/hash_functions.h"
 #include "trace/trace.h"

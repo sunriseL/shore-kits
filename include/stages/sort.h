@@ -4,7 +4,7 @@
 #define __SORT_H
 
 #include "stage.h"
-
+#include "dispatcher.h"
 
 
 using namespace qpipe;

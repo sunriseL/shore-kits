@@ -142,6 +142,28 @@ public:
 };
 
 
+/**
+ * @brief A key-tuple pair used for operations such as hashing and
+ * sorting. The first 32 bits of the key (or hash) are stored directly
+ * and should suffice for most comparisons; the full key can always be
+ * accessed by following the pointer to the tuple's data.
+ */
+
+struct key_tuple_pair_t {
+    int key;
+    char *data;
+
+    key_tuple_pair_t()
+        : key(0), data(NULL)
+    {
+    }
+    key_tuple_pair_t(int k, char *d)
+        : key(k), data(d)
+    {
+    }
+};
+
+
 
 /**
  *@brief Base comparison functor. Extend it to implement specific
@@ -160,7 +182,16 @@ public:
      * @return negative if a < b, positive if a > b, and zero if a == b
      */
     
-    virtual int compare(const tuple_t &a, const tuple_t &b)=0;
+    virtual int compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b)=0;
+
+
+
+    /**
+     * @brief returns the 32-bit key this comparator uses for primary
+     * comparisons. See (key_tuple_pair_t).
+     */
+    
+    virtual int make_key(const tuple_t &tuple)=0;
 
 
     

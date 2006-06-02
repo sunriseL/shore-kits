@@ -201,7 +201,7 @@ int main() {
 
     int * d = NULL;
 
-    while(!output_buffer.get_tuple(output)) {
+    while(output_buffer.get_tuple(output)) {
 	d = (int*)output.data;
         TRACE(TRACE_ALWAYS, "Read ID: %d - %d - %d\n", d[0], d[1], d[2]);
     }

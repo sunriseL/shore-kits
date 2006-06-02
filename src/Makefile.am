@@ -19,7 +19,7 @@ TRACE = \
    trace/trace_stream.cpp
 
 DISPATCHER = \
-   dispatcher/dispatcher.cpp
+   dispatcher.cpp
 
 UTIL = \
    util/static_hash_map.cpp \

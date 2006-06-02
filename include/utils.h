@@ -4,10 +4,39 @@
 #define __UTILS_H
 
 #include <cstdio>
-
-
+#include <cassert>
+#include "tuple.h"
 
 /* exported datatypes */
+
+using qpipe::tuple_buffer_t;
+
+/**
+ *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
+ *  that the buffer is closed when wrapper goes out of scope. By using
+ *  this wrapper, we can avoid duplicating close() code at every exit
+ *  point.
+ */
+struct buffer_guard_t {
+    tuple_buffer_t *buffer;
+    buffer_guard_t(tuple_buffer_t *buf)
+        : buffer(buf)
+    {
+    }
+  
+    ~buffer_guard_t() {
+        buffer->close();
+    }
+
+    tuple_buffer_t *operator->() {
+        return buffer;
+    }
+
+    operator tuple_buffer_t*() {
+        return buffer;
+    }
+
+};
 
 
 /**
@@ -16,16 +45,44 @@
  */
 
 template <typename T>
-struct scope_delete_t {
+struct pointer_guard_t {
     T *ptr;
-    scope_delete_t(T *p)
+    pointer_guard_t(T *p)
         : ptr(p)
     {
     }
 
-    ~scope_delete_t() {
+    ~pointer_guard_t() {
         if(ptr)
             delete ptr;
+    }
+    operator T*() {
+        return ptr;
+    }
+    
+    T *operator ->() {
+        return ptr;
+    }
+};
+
+
+
+/**
+ *  @brief A helper class that automatically deletes an array when
+ *  'this' goes out of scope.
+ */
+
+template <typename T>
+struct array_guard_t {
+    T *ptr;
+    array_guard_t(T *p)
+        : ptr(p)
+    {
+    }
+
+    ~array_guard_t() {
+        if(ptr)
+            delete [] ptr;
     }
     operator T*() {
         return ptr;

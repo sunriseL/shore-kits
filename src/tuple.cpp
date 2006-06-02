@@ -26,7 +26,7 @@ int tuple_buffer_t::check_page_full() {
             return 1;
         
         // TODO: something besides malloc
-        write_page = tuple_page_t::alloc(tuple_size, malloc);
+        write_page = tuple_page_t::alloc(tuple_size, malloc, _page_size);
         return 0;
     }
 
@@ -40,8 +40,8 @@ int tuple_buffer_t::check_page_full() {
  *  @brief Block until either inputs become available or the
  *  producer closes the buffer (sending EOF).
  *
- *  @return false if the producer has closed the buffer. true
- *  otherwise. If this function returns true, inputs are
+ *  @return 1 if the producer has closed the buffer. 0
+ *  otherwise. If this function returns 0, inputs are
  *  available.
  */
 
@@ -127,22 +127,22 @@ void tuple_buffer_t::close() {
  *
  *  @param _tuple_size The size of the tuples this buffer will store.
  *
- *  @param _page_size The size of the pages to use for this buffer.
+ *  @param page_size The size of the pages to use for this buffer.
  *
  *  @return 0 on successful initialization. Negative value on error
  *  (if the allocate fails to create a page).
  */
 
-int tuple_buffer_t::init(size_t _tuple_size, size_t _page_size) {
+int tuple_buffer_t::init(size_t _tuple_size, size_t page_size) {
 
-    write_page = tuple_page_t::alloc(_tuple_size, malloc);
+    write_page = tuple_page_t::alloc(_tuple_size, malloc, page_size);
     if (write_page == NULL)
 	return -1;
 	
     input_arrived = false;
     initialized = false;
     tuple_size = _tuple_size;
-    page_size = _page_size;
+    _page_size = page_size;
     read_page = NULL;
 
     pthread_mutex_init_wrapper(&init_lock, NULL);
