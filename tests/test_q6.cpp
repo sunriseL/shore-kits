@@ -1,6 +1,11 @@
 // -*- mode:C++ c-basic-offset:4 -*-
+
+#include "thread.h"
+#include "tester_thread.h"
 #include "stages/tscan.h"
+#include "stages/aggregate.h"
 #include "trace/trace.h"
+#include "qpipe_panic.h"
 
 using namespace qpipe;
 
@@ -89,13 +94,15 @@ void *drive_stage(void *arg)
 }
 
 
-/* Specific filter for this client */
+
+/* Specific TBSCAN filter for this client */
 
 /* @TODO: tscan_filter should record the first (rid) and when it meets it again
    it should signal that it finished the processing */
 
 
 class q6_filter_t : public tuple_filter_t {
+
 public:
     virtual bool select(const tuple_t & input) {
 	// TODO: Should ask the Catalog
@@ -119,6 +126,31 @@ public:
 
 
 
+/* Count aggregator */
+
+class count_aggregate_t : public tuple_aggregate_t {
+
+private:
+  int count;
+    
+public:
+  
+  count_aggregate_t() {
+    count = 0;
+  }
+  
+  bool aggregate(tuple_t &, const tuple_t &) {
+    count++;
+    return false;
+  }
+
+  bool eof(tuple_t &dest) {
+    *(int*)dest.data = count;
+    return true;
+  }
+};
+
+
 
 /** @fn    : main
  *  @brief : Calls a table scan and outputs a specific projection
@@ -128,14 +160,26 @@ int main() {
 
     thread_init();
 
-    tscan_stage_t *stage = new tscan_stage_t();
+    // creates a TSCAN stage
+    tscan_stage_t *tscan_stage = new tscan_stage_t();
+    tester_thread_t* tscan_thread = new tester_thread_t(drive_stage, tscan_stage, "TSCAN THREAD");
+    if ( thread_create( NULL, tscan_thread ) ) {
+	TRACE(TRACE_ALWAYS, "thread_create failed\n");
+	QPIPE_PANIC();
+    }
 
-    pthread_t stage_thread;
+
+    // creates a AGG stage
+    aggregate_stage_t *agg_stage = new aggregate_stage_t();
+    tester_thread_t* aggregate_thread = new tester_thread_t(drive_stage, agg_stage, "AGGREGATE THREAD");
+    if ( thread_create( NULL, aggregate_thread ) ) {
+	TRACE(TRACE_ALWAYS, "thread_create failed\n");
+	QPIPE_PANIC();
+    }
+
+
     pthread_mutex_t mutex;
-
     pthread_mutex_init_wrapper(&mutex, NULL);
-    
-    pthread_create(&stage_thread, NULL, &drive_stage, stage);
 
     Db* tpch_lineitem = NULL;
     DbEnv* dbenv = NULL;
@@ -184,27 +228,43 @@ int main() {
 	TRACE(TRACE_ALWAYS, "std::exception\n");
     }
     
-    // the output consists of 3 integers
-    tuple_buffer_t output_buffer(3*sizeof(int));
-    tuple_filter_t *filter = new q6_filter_t();
-    tscan_packet_t *packet = new tscan_packet_t("test tscan",
-						tpch_lineitem,
-						/* TODO: Should get that size from Catalog */
-						sizeof(tpch_lineitem_tuple),
-						&output_buffer,
-						filter);
+
     
-    stage->enqueue(packet);
+    // TSCAN PACKET CREATION
+    // the tbscan output consists of 1 integer
+    tuple_buffer_t q6_tscan_output_buffer(sizeof(int));
+    tuple_filter_t *q6_tscan_filter = new q6_filter_t();
+        
+    tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
+							 tpch_lineitem,
+							 /* TODO: Should get that size from Catalog */
+							 sizeof(tpch_lineitem_tuple),
+							 &q6_tscan_output_buffer,
+							 q6_tscan_filter);
+
+
+    // AGG PACKET CREATION
+    // the output is always a single int
+    tuple_buffer_t  q6_agg_output_buffer(sizeof(int));
+    tuple_filter_t* q6_agg_filter = new tuple_filter_t();
+    count_aggregate_t*  q6_aggregator = new count_aggregate_t();
+    
+    aggregate_packet_t* q6_agg_packet = new aggregate_packet_t("test aggregate",
+							       &q6_agg_output_buffer,
+							       &q6_tscan_output_buffer,
+							       q6_agg_filter,
+							       q6_aggregator);
+    
+    // ENQUEUE PACKETS
+    agg_stage->enqueue(q6_agg_packet);
+    tscan_stage->enqueue(q6_tscan_packet);
     
     tuple_t output;
-    output_buffer.init_buffer();
+    q6_agg_output_buffer.init_buffer();
+    q6_tscan_output_buffer.init_buffer();
 
-    int * d = NULL;
-
-    while(!output_buffer.get_tuple(output)) {
-	d = (int*)output.data;
-        TRACE(TRACE_ALWAYS, "Read ID: %d - %d - %d\n", d[0], d[1], d[2]);
-    }
+    while(q6_agg_output_buffer.get_tuple(output))
+      TRACE(TRACE_ALWAYS, "*** Q6 Count: %d ***\n", *(int*)output.data);
 
     try {    
 	// closes file and environment

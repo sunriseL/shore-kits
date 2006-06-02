@@ -264,8 +264,7 @@ int stage_t::process_next_packet(void) {
 
 
 
-int stage_t::output(packet_t* packet, const tuple_t &tuple)
-{
+int stage_t::output(packet_t* packet, const tuple_t &tuple) {
 
     packet_list_t::iterator it;
     {
@@ -276,6 +275,11 @@ int stage_t::output(packet_t* packet, const tuple_t &tuple)
     // send the tuple to the output buffers
     int failed = 1;
     tuple_t out_tup;
+
+    // we are not considering the case the tuple not pass any filter. 
+    // In that case variable failed was untouched and incorrectly was returning fail.
+    int filter_pass = 0;
+
     while(it != packet->merged_packets.end()) {
         packet_t *other = *it;
         int ret = 0;
@@ -283,9 +287,13 @@ int stage_t::output(packet_t* packet, const tuple_t &tuple)
         // was this tuple selected?
         if(other->filter->select(tuple)) {
             ret = packet->output_buffer->alloc_tuple(out_tup);
+
             packet->filter->project(out_tup, tuple);
             // output succeeds unless all writes fail
             failed &= ret;
+
+	    // the tuple passed the filter of at least one consumer
+	    filter_pass++;
         }
 
         // delete a finished packet?
@@ -303,9 +311,17 @@ int stage_t::output(packet_t* packet, const tuple_t &tuple)
         }
         else
             ++it;
+
     }
-    
-    return failed;
+
+
+    // if no tuple passed filter return success
+    if (filter_pass > 0) {
+	return failed;
+    }
+    else {
+	return (0);
+    }
 }
 
 

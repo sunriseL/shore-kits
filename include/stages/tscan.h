@@ -29,14 +29,18 @@ using namespace qpipe;
  */
 struct tscan_packet_t : public packet_t {
     Db *input_table;
+    size_t input_tuple_size;
     bool mergeable;
+
     tscan_packet_t(char *packet_id,
+                   Db *in_table,
+		   size_t in_tup_sz,
                    tuple_buffer_t *out_buffer,
-                   tuple_filter_t *filt,
-                   Db *in_table )
+		   tuple_filter_t *filt)
         : packet_t(packet_id, TSCAN_PACKET_TYPE, out_buffer, filt),
-          input_table(in_table),
-          mergeable(true)
+	 input_table(in_table),
+	 input_tuple_size(in_tup_sz),
+	 mergeable(true)
     {
     }
 

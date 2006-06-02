@@ -52,6 +52,7 @@ int tscan_stage_t::process_packet(packet_t *p) {
         db->err(tmp_ret, "ERROR opening cursor for tscan: ");
         QPIPE_PANIC();
     }
+
     
     // make sure the cursor gets closed properly
     cursor_guard_t cursor_guard(db, dbcp);
@@ -71,21 +72,38 @@ int tscan_stage_t::process_packet(packet_t *p) {
     bulk_data.set_flags(DB_DBT_USERMEM);
 
 
+    int i = 0;
     while(1) {
         // request a group of tuples
+	TRACE(TRACE_DEBUG,"%d\n", ++i);
+
         int tmp_ret = dbcp->get(&bulk_key, &bulk_data,
                                 DB_MULTIPLE_KEY | DB_NEXT);
+
         if(tmp_ret != 0)
             break;
 
         // iterator over the group
         Dbt key, data;
         DbMultipleKeyDataIterator it = bulk_data;
+
+	int k = 0;
         while(it.next(key, data)) {
-            if(!output(packet, data)) 
-                return 1;
+
+	    TRACE(TRACE_DEBUG, "%d\n", ++k);
+
+	    /* should create a tuple_t from these data,
+	       size of input_tuple_size */
+	    tuple_t table_tuple((char*)data.get_data(), packet->input_tuple_size);
+
+            if(output(packet, table_tuple)) {
+		TRACE(TRACE_DEBUG, "output(packet, data) returned Error\n");
+                return (1);
+	    }
         }
     }
+
+    TRACE(TRACE_DEBUG, "Actual TSCAN: Bulk reading finished...\n");
 
     // test for read errors
     if(tmp_ret != DB_NOTFOUND) {
@@ -93,5 +111,6 @@ int tscan_stage_t::process_packet(packet_t *p) {
         QPIPE_PANIC();
     }
 
-    return 0;
+    // cursor_guard??
+    return (0);
 }
