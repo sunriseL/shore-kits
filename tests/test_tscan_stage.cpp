@@ -9,7 +9,7 @@ using namespace qpipe;
 
 # define DATABASE_HOME	 "."
 # define CONFIG_DATA_DIR "./database"
-# define TMP_DIR "./tmp"
+# define TMP_DIR "./temp"
 
 # define TABLE_LINEITEM_NAME "LINEITEM"
 # define TABLE_LINEITEM_ID   "TBL_LITEM"
@@ -17,6 +17,41 @@ using namespace qpipe;
 /* Set Bufferpool equal to 450 MB -- Maximum is 4GB in 32-bit platforms */
 size_t TPCH_BUFFER_POOL_SIZE_GB = 0; /* 0 GB */
 size_t TPCH_BUFFER_POOL_SIZE_BYTES = 450 * 1024 * 1024; /* 450 MB */
+
+
+/* tpch_l_shipmode.
+   TODO: Unnecessary */
+enum tpch_l_shipmode {
+	REG_AIR,
+	AIR,
+	RAIL,
+	TRUCK,
+	MAIL,
+	FOB,
+	SHIP
+};
+
+
+/* Lineitem tuple.
+   TODO: Catalog will provide this metadata info */
+struct tpch_lineitem_tuple {
+  int L_ORDERKEY;
+  int L_PARTKEY;
+  int L_SUPPKEY;
+  int L_LINENUMBER;
+  double L_QUANTITY;
+  double L_EXTENDEDPRICE;
+  double L_DISCOUNT;
+  double L_TAX;
+  char L_RETURNFLAG;
+  char L_LINESTATUS;
+  time_t L_SHIPDATE;
+  time_t L_COMMITDATE;
+  time_t L_RECEIPTDATE;
+  char L_SHIPINSTRUCT[25];
+  tpch_l_shipmode L_SHIPMODE;
+  // char L_COMMENT[44];
+};
 
 
 int tpch_lineitem_bt_compare_fcn(Db*, const Dbt* k1, const Dbt* k2) {
@@ -61,17 +96,25 @@ public:
     virtual bool select(const tuple_t & input) {
 	// TODO: Should ask the Catalog
 	// naive filtering 
-        if ((int)(*(int*)input.data)) {
+	double* d_discount = (double*)(input.data + 4*sizeof(int)+3*sizeof(double));
+
+	TRACE(TRACE_DEBUG, "Filtering:\t %.2f\n", *d_discount);
+	
+	/* when it return fail it does not break */
+	return (false);
+
+        if (*d_discount > 0.04) {
+	    TRACE(TRACE_DEBUG, "Filter result:\t Pass\n");
 	    return (true);
 	}
-	
+
+	TRACE(TRACE_DEBUG, "Filter result:\t Fail\n");	
 	return (false);
     }
-
     
     virtual void project(tuple_t &dest, const tuple_t &src) {
-	// copies only the first three integers of the tuple
-	dest.assign(src);
+
+	memcpy(dest.data, src.data, dest.size);
     }
 
 };
@@ -85,78 +128,86 @@ public:
 
 int main() {
 
+    thread_init();
+
     tscan_stage_t *stage = new tscan_stage_t();
 
     pthread_t stage_thread;
-    pthread_t source_thread;
     pthread_mutex_t mutex;
 
     pthread_mutex_init_wrapper(&mutex, NULL);
     
     pthread_create(&stage_thread, NULL, &drive_stage, stage);
 
-    // the tscan packet does not have an input buffer
-    // but a table
     Db* tpch_lineitem = NULL;
+    DbEnv* dbenv = NULL;
 
-    //
-    // Create an environment object and initialize it for error
-    // reporting.
-    //
-    DbEnv* dbenv = new DbEnv(0);
-    dbenv->set_errpfx("qpipe");
+    try {
+	// the tscan packet does not have an input buffer but a table
+
+	// Create an environment object and initialize it for error
+	// reporting.
+	dbenv = new DbEnv(0);
+	dbenv->set_errpfx("qpipe");
 	
-    //
-    // We want to specify the shared memory buffer pool cachesize,
-    // but everything else is the default.
-    //
-
+	// We want to specify the shared memory buffer pool cachesize,
+	// but everything else is the default.
   
-    //dbenv->set_cachesize(0, TPCH_BUFFER_POOL_SIZE, 0);
-    if (dbenv->set_cachesize(TPCH_BUFFER_POOL_SIZE_GB, TPCH_BUFFER_POOL_SIZE_BYTES, 0)) {
-	fprintf(stdout, "*** Error while trying to set BUFFERPOOL size ***\n");
-    }
-    else {
-	fprintf(stdout, "*** BUFFERPOOL SIZE SET: %d GB + %d B ***\n", TPCH_BUFFER_POOL_SIZE_GB, TPCH_BUFFER_POOL_SIZE_BYTES);
-    }
+	//dbenv->set_cachesize(0, TPCH_BUFFER_POOL_SIZE, 0);
+	if (dbenv->set_cachesize(TPCH_BUFFER_POOL_SIZE_GB, TPCH_BUFFER_POOL_SIZE_BYTES, 0)) {
+	    TRACE(TRACE_ALWAYS, "*** Error while trying to set BUFFERPOOL size ***\n");
+	}
+	else {
+	    TRACE(TRACE_ALWAYS, "*** BUFFERPOOL SIZE SET: %d GB + %d B ***\n", TPCH_BUFFER_POOL_SIZE_GB, TPCH_BUFFER_POOL_SIZE_BYTES);
+	}
 
-
-    // Databases are in a subdirectory.
-    dbenv->set_data_dir(CONFIG_DATA_DIR);
+	// Databases are in a subdirectory.
+	dbenv->set_data_dir(CONFIG_DATA_DIR);
   
-    // set temporary directory
-    dbenv->set_tmp_dir(TMP_DIR);
+	// set temporary directory
+	dbenv->set_tmp_dir(TMP_DIR);
 
-    // Open the environment with no transactional support.
-    dbenv->open(DATABASE_HOME, DB_CREATE | DB_PRIVATE | DB_THREAD | DB_INIT_MPOOL, 0);
+	// Open the environment with no transactional support.
+	dbenv->open(DATABASE_HOME, DB_CREATE | DB_PRIVATE | DB_THREAD | DB_INIT_MPOOL, 0);
 
-    tpch_lineitem = new Db(dbenv, 0);
+	tpch_lineitem = new Db(dbenv, 0);
 
 
-    tpch_lineitem->set_bt_compare(tpch_lineitem_bt_compare_fcn);
-    tpch_lineitem->open(NULL, TABLE_LINEITEM_NAME, NULL, DB_BTREE,
-			DB_RDONLY | DB_THREAD, 0644);
+	tpch_lineitem->set_bt_compare(tpch_lineitem_bt_compare_fcn);
+	tpch_lineitem->open(NULL, TABLE_LINEITEM_NAME, NULL, DB_BTREE,
+			    DB_RDONLY | DB_THREAD, 0644);
 
-    TRACE(TRACE_ALWAYS, "Lineitem table opened...");
-
+	TRACE(TRACE_ALWAYS, "Lineitem table opened...\n");
+    }
+    catch ( DbException &e) {
+	TRACE(TRACE_ALWAYS, "DbException: %s\n", e.what());
+    }
+    catch ( std::exception &en) {
+	TRACE(TRACE_ALWAYS, "std::exception\n");
+    }
     
-    // the output is always a single int
-    tuple_buffer_t output_buffer(sizeof(int));
+    // the output consists of 3 integers
+    tuple_buffer_t output_buffer(3*sizeof(int));
 
     tuple_filter_t *filter = new q6_filter_t();
         
     tscan_packet_t *packet = new tscan_packet_t("test tscan",
+						tpch_lineitem,
+						/* TODO: Should get that size from Catalog */
+						sizeof(tpch_lineitem_tuple),
 						&output_buffer,
-						filter,
-						tpch_lineitem);
+						filter);
     
     stage->enqueue(packet);
     
     tuple_t output;
     output_buffer.init_buffer();
-    while(output_buffer.get_tuple(output))
-        printf("Count: %d\n", *(int*)output.data);
 
+    int * d = NULL;
+    while(output_buffer.get_tuple(output)) {
+	d = (int*)output.data;
+        printf("Read ID: %d - %d - %d\n", d[0], d[1], d[2]);
+    }
 
     try {    
 	// closes file and environment
