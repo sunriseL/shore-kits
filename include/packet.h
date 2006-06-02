@@ -14,7 +14,12 @@
 #include "namespace.h"
 
 using std::list;
-class packet_t;
+
+
+
+/* exported datatypes */
+
+class   packet_t;
 typedef list<packet_t*> packet_list_t;
 
 
@@ -37,7 +42,9 @@ class packet_t
 {
 
 public:
+    
 
+    
     char*  packet_id;
     char*  packet_type;
 
@@ -45,7 +52,7 @@ public:
     tuple_filter_t* filter;
   
     // is this packet a candidate for merging?
-    bool mergeable;
+    bool  mergeable;    
 
     // mutex to protect the chain of merged packets
     pthread_mutex_t merge_mutex;

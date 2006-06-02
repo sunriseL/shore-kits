@@ -32,6 +32,9 @@ int fscan_stage_t::process_packet(packet_t* p) {
     if ( file == NULL ) {
 	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n",
 	      packet->_filename);
+
+	// need to kill query...
+
 	return -1;
     }
 
@@ -40,10 +43,11 @@ int fscan_stage_t::process_packet(packet_t* p) {
 	tuple_page_t::alloc(packet->_tuple_size, malloc);
     if ( tuple_page == NULL ) {
 	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
-	if ( fclose(file) ) {
+	if ( fclose(file) )
 	    TRACE(TRACE_ALWAYS, "fclose() failed\n");
-	    // drop down to return -1
-	}
+    
+	// need to kill query...
+
 	return -1;
     }
 
@@ -64,13 +68,14 @@ int fscan_stage_t::process_packet(packet_t* p) {
 	      packet->_filename);
 	return_value = -1;
     }
+
+    
+    // if return_value == -1, need to kill query...
     
     
     return return_value;
 }
 
-
-/* definitions of internal helper functions */
 
 
 int fscan_stage_t::read_file(packet_t* packet, FILE* file, tuple_page_t* tuple_page) {
@@ -86,7 +91,7 @@ int fscan_stage_t::read_file(packet_t* packet, FILE* file, tuple_page_t* tuple_p
 	
 	if ( count < tuple_page->capacity() ) {
 	    // short read! treat this as an error!
-	    TRACE(TRACE_ALWAYS, "page.fread() read %d/%d tuples\n",
+	    TRACE(TRACE_ALWAYS, "tuple_page.fread() read %z/%z tuples\n",
 		  count,
 		  tuple_page->capacity());
 	    return -1;

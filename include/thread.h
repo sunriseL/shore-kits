@@ -26,20 +26,20 @@ class thread_t {
 
 private:
 
-  char* thread_name;
+    char* thread_name;
 
 public:
 
-  virtual void* run()=0;
-  const char*   get_thread_name();
-  virtual       ~thread_t();
+    virtual void* run()=0;
+    const char*   get_thread_name();
+    virtual       ~thread_t();
 
 protected:
 
-  thread_t(void);
+    thread_t(void);
 
-  int init_thread_name  (const char* format, ...);
-  int init_thread_name_v(const char* format, va_list ap);
+    int init_thread_name  (const char* format, ...);
+    int init_thread_name_v(const char* format, va_list ap);
 };
 
 

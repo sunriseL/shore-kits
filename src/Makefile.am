@@ -9,7 +9,8 @@ STAGES = \
    stages/scalar_aggregate.cpp \
    stages/aggregate.cpp \
    stages/tscan.cpp \
-   stages/fscan.cpp
+   stages/fscan.cpp \
+   stages/fdump.cpp
 
 TRACE = \
    trace/trace.cpp \

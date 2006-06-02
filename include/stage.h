@@ -68,6 +68,38 @@ protected:
     // set of packets currently being processed
     packet_list_t merge_candidates;
     
+
+    /* Each stage must override this method with the functionality of
+       that stage. */
+    virtual int process_packet(packet_t *packet)=0;
+
+    
+    void stage_queue_enqueue(packet_t* packet);
+    
+
+    packet_t* stage_queue_dequeue();
+
+
+    void set_not_mergeable(packet_t *packet);
+    
+
+    /**
+     *  @brief Write a tuple to each waiting output buffer in a chain of
+     *  packets.
+     *
+     *  @return 0 on success. Non-zero on error (such as early
+     *  termination).
+     */
+
+    int output(packet_t* packet, const tuple_t &tuple);
+
+    /**
+     *  @brief cleans up after completing work on a packet.
+     */
+
+    void done(packet_t *packet);
+
+
 public:
 
     stage_t(const char* stage_name);
@@ -88,39 +120,6 @@ public:
        function. */
     int process_next_packet();
 
-
-protected:
-
-    
-    /* Each stage must override this method with the functionality of
-       that stage. */
-    virtual int process_packet(packet_t *packet)=0;
-
-
-    packet_t* dequeue();
-    
-    
-    void add_to_stage_queue(packet_t* packet);
-    
-
-    void set_not_mergeable(packet_t *packet);
-    
-
-    /**
-     *  @brief Write a tuple to each waiting output buffer in a chain of
-     *  packets.
-     *
-     *  @return 0 on success. Non-zero on error (such as early
-     *  termination).
-     */
-
-    int output(packet_t* packet, const tuple_t &tuple);
-
-    /**
-     *  @brief cleans up after completing work on a packet.
-     */
-
-    void done(packet_t *packet);
 
 };
 

@@ -71,49 +71,16 @@ stage_t::~stage_t(void) {
 
 
 /**
- *  @brief Helper function used to remove the next packet in this
- *  stage's queue. If no packets are available, wait for one to
- *  appear.
+ *  @brief Helper function used to add the specified packet to the
+ *  stage_queue and signal a waiting worker thread, if one exists.
  *
- *  This function acquires the stage_lock mutex and waits in the
- *  stage_queue_packet_available is no packets are available.
+ *  THE CALLER MUST BE HOLDING THE stage_lock MUTEX.
  */
+void stage_t::stage_queue_enqueue(packet_t* packet) {
 
-packet_t* stage_t::dequeue(void) {
-
-    TRACE(TRACE_PACKET_FLOW, "Trying to dequeue packet from stage %s\n",
+    TRACE(TRACE_PACKET_FLOW, "Enqueuing packet %s in stage %s\n",
+	  packet->packet_id,
 	  get_name());
-  
-    // * * * BEGIN CRITICAL SECTION * * *
-    pthread_mutex_lock_wrapper(&stage_lock);
-  
-    while ( stage_queue.empty() ) {
-	pthread_cond_wait_wrapper( &stage_queue_packet_available, &stage_lock );
-    }
-
-    // remove packet
-    packet_t* p = stage_queue.front();
-    stage_queue.pop_front();
-
-    pthread_mutex_unlock_wrapper(&stage_lock);
-    // * * * END CRITICAL SECTION * * *
-
-
-    TRACE(TRACE_PACKET_FLOW, "Dequeued packet %s from stage %s\n",
-	  p->packet_id,
-	  get_name());
-  
-    return p;
-}
-
-
-
-/**
- *  @brief Add the specified packet to the stage_queue and signal any
- *  waiting worker threads. The caller must be holding the stage_lock
- *  mutex.
- */
-void stage_t::add_to_stage_queue(packet_t* packet) {
 
     stage_queue.push_back(packet);
     pthread_cond_signal_wrapper(&stage_queue_packet_available);
@@ -121,28 +88,62 @@ void stage_t::add_to_stage_queue(packet_t* packet) {
 
 
 
-void stage_t::enqueue(packet_t *new_pack) {
+/**
+ *  @brief Helper function used to remove the next packet in this
+ *  stage's queue. If no packets are available, wait for one to
+ *  appear.
+ *
+ *  THE CALLER MUST BE HOLDING THE stage_lock MUTEX.
+ */
+
+packet_t* stage_t::stage_queue_dequeue(void) {
+
+    // wait for a packet to appear
+    while ( stage_queue.empty() ) {
+	pthread_cond_wait_wrapper( &stage_queue_packet_available, &stage_lock );
+    }
+
+    // remove available packet
+    packet_t* packet = stage_queue.front();
+    stage_queue.pop_front();
+    
+    TRACE(TRACE_PACKET_FLOW, "Dequeued packet %s in stage %s\n",
+	  packet->packet_id,
+	  get_name());
+  
+    return packet;
+}
+
+
+
+
+
+
+void stage_t::enqueue(packet_t* new_packet) {
     
     // error checking
-    if(new_pack == NULL) {
-	TRACE(TRACE_ALWAYS, "Called with NULL packet for stage %s!",
+    if(new_packet == NULL) {
+	TRACE(TRACE_ALWAYS, "Called with NULL packet on stage %s!",
 	      get_name());
 	QPIPE_PANIC();
     }
   
 
     packet_list_t::iterator it;
-
-
+    
+    
     // * * * BEGIN CRITICAL SECTION * * *
     critical_section_t cs(&stage_lock);
     
 
-    if ( !new_pack->mergeable ) {
+    // check for non-mergeable packets
+    if ( !new_packet->mergeable ) {
 	// We are forcing the new packet to not merge with others.
-	add_to_stage_queue(new_pack);
+	stage_queue_enqueue(new_packet);
 	return;
     }
+
+
 
 
     // try merging with packets in merge_candidates before they
@@ -150,12 +151,12 @@ void stage_t::enqueue(packet_t *new_pack) {
     for(it = merge_candidates.begin(); it != merge_candidates.end(); ++it) {
 
 	// cand is a possible candidate for us to merge new_pack with
-        packet_t *cand = *it;
+        packet_t* mc_packet = *it;
     
 	// * * * BEGIN NESTED CRITICAL SECTION * * *
-	critical_section_t cs2(&cand->merge_mutex);
-        if (cand->mergeable && cand->is_mergeable(new_pack)) { 
-            cand->merge(new_pack);
+	critical_section_t cs2(&mc_packet->merge_mutex);
+        if (mc_packet->mergeable && mc_packet->is_mergeable(new_packet)) {
+            mc_packet->merge(new_packet);
 	    return;
 	}
 	// * * * END NESTED CRITICAL SECTION * * *
@@ -171,7 +172,7 @@ void stage_t::enqueue(packet_t *new_pack) {
 
 	// queue_pack is a possible candidate for us to merge new_pack
 	// with
-        packet_t *queue_pack = *it;
+        packet_t* sq_packet = *it;
 
 	// No need to acquire queue_pack's merge mutex. No other
 	// thread can touch it until we release the stage_lock.
@@ -180,8 +181,8 @@ void stage_t::enqueue(packet_t *new_pack) {
 	// packets are non-mergeable from the beginning. Don't need to
 	// grab its merge_mutex because its mergeability status could
 	// not have changed while it was in the queue.
-        if (queue_pack->mergeable && queue_pack->is_mergeable(new_pack)) {
-            queue_pack->merge(new_pack);
+        if (sq_packet->mergeable && sq_packet->is_mergeable(new_packet)) {
+            sq_packet->merge(new_packet);
 	    return;
 	}
     }
@@ -189,7 +190,7 @@ void stage_t::enqueue(packet_t *new_pack) {
 
     // No work sharing detected. We can now give up and insert the new
     // packet into the stage_queue.
-    add_to_stage_queue(new_pack);
+    stage_queue_enqueue(new_packet);
     
     // * * * END CRITICAL SECTION * * *
 }
@@ -216,46 +217,29 @@ void stage_t::set_not_mergeable(packet_t *packet) {
 
 int stage_t::process_next_packet(void) {
 
-    // block until a new packet becomes available
-    scope_delete_t<packet_t> packet = dequeue();
 
+    // wait for a packet to become available
+    pthread_mutex_lock_wrapper(&stage_lock);
+    scope_delete_t<packet_t> packet = stage_queue_dequeue();
+    pthread_mutex_lock_wrapper(&stage_lock);
+
+
+    // error checking
     if(packet == NULL) {
-        // error checking
-	TRACE(TRACE_ALWAYS, "Removed NULL packet in stage %s!", get_name());
+	TRACE(TRACE_ALWAYS, "Dequeued NULL packet in %s stage queue!", get_name());
 	QPIPE_PANIC();
     }
 
+    
     // TODO: process rebinding instructions here
   
 
-    // Wait for a green light from the parent. What about the parents
-    // of merged packets? Even if we wait for the packets we have,
-    // there could be other packets merged with us later. We really
-    // need to invoke wait_init() on every packet before outputing a
-    // tuple to it.
-    if( packet->output_buffer->wait_init() ) {
-        // remove the packet from the side queue
-        critical_section_t cs(&stage_lock);
-        
-        // make sure nobody else tries to merge
-        set_not_mergeable(packet);
-        packet->terminate();
-        packet->merged_packets.pop_back();
-        
-        // TODO: check if we have any merged packets before closing
-        // the input buffer
-        return 1;
-    }
-
-    // perform stage-specified processing
-    TRACE(TRACE_DEBUG, "wait_init() returned for %s\n", packet->packet_id);
-
     int early_termination = process_packet(packet);
-
     if(early_termination) {
         // TODO: terminate all packets in the chain
     }
-
+    
+    
     // close the output buffer
     // TODO: also close merged packets' output buffers
     packet->output_buffer->send_eof();
