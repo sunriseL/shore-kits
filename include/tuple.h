@@ -287,7 +287,7 @@ public:
      *  @return The number of tuples read.
      */
 
-    int fread(FILE *file) {
+    size_t fread(FILE *file) {
 
         char *base = &_data[_end_offset];
 	
@@ -312,7 +312,7 @@ public:
      *  @return The number of tuples written.
      */
     
-    int fwrite(FILE *file) {
+    size_t fwrite(FILE *file) {
         return ::fwrite(_data, tuple_size(), tuple_count(), file);
     }
 

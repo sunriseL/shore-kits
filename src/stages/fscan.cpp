@@ -39,8 +39,9 @@ int fscan_stage_t::process_packet(packet_t* p) {
     }
 
 
+    size_t tuple_size = packet->output_buffer->tuple_size;
     tuple_page_t* tuple_page =
-	tuple_page_t::alloc(packet->_tuple_size, malloc);
+	tuple_page_t::alloc(tuple_size, malloc);
     if ( tuple_page == NULL ) {
 	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
 	if ( fclose(file) )

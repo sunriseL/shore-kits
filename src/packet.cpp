@@ -16,8 +16,8 @@
  *  @brief packet_t constructor.
  */
 
-packet_t::packet_t(char* _packet_id,
-		   char* _packet_type,
+packet_t::packet_t(const char* _packet_id,
+		   const char* _packet_type,
 		   tuple_buffer_t* _output_buffer,
 		   tuple_filter_t* _filter,
                    bool _mergeable)

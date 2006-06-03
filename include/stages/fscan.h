@@ -33,18 +33,15 @@ using namespace qpipe;
 struct fscan_packet_t : public packet_t {
   
   const char* _filename;
-  int         _tuple_size;
   
   bool mergeable;
 
   fscan_packet_t(char*  packet_id,
 		 tuple_buffer_t* out_buffer,
 		 tuple_filter_t* filt,
-		 const char* filename,
-		 int tuple_size)
+		 const char* filename)
     : packet_t(packet_id, FSCAN_PACKET_TYPE, out_buffer, filt),
-       _filename(filename),
-       _tuple_size(tuple_size)
+       _filename(filename)
   {
   }
 

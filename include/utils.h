@@ -19,14 +19,21 @@ using qpipe::tuple_buffer_t;
  */
 struct buffer_guard_t {
     tuple_buffer_t *buffer;
-    buffer_guard_t(tuple_buffer_t *buf)
-        : buffer(buf)
-    {
-        buffer->init_buffer();
+    buffer_guard_t(tuple_buffer_t *buf=NULL) {
+        *this = buf;
     }
   
     ~buffer_guard_t() {
-        buffer->close();
+        if(buffer)
+            buffer->close();
+    }
+
+    buffer_guard_t &operator=(tuple_buffer_t *buf) {
+        buffer = buf;
+        if(buffer)
+            buffer->init_buffer();
+        
+        return *this;
     }
 
     tuple_buffer_t *operator->() {
@@ -36,7 +43,10 @@ struct buffer_guard_t {
     operator tuple_buffer_t*() {
         return buffer;
     }
-
+private:
+    // no copying
+    buffer_guard_t &operator=(const buffer_guard_t &other);
+    buffer_guard_t(const buffer_guard_t &other);
 };
 
 

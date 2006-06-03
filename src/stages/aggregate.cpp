@@ -18,7 +18,7 @@ int aggregate_stage_t::process_packet(packet_t *p) {
 
 
     // automatically close the input buffer when this function exits
-    buffer_guard_t input = packet->input_buffer;
+    buffer_guard_t input(packet->input_buffer);
     tuple_aggregate_t* aggregate = packet->aggregate;
 
     // input buffer owns src

@@ -23,7 +23,7 @@
 
 
 class stage_t;
-
+class packet_t;
 
 /**
  *  @brief QPIPE dispatcher that dispatches all packets. All stages
@@ -64,6 +64,7 @@ protected:
 public:
 
     static int register_stage (const char* packet_type, stage_t* stage);
+    static void dispatch_packet(packet_t *packet, const char *type);
     //    static void dispatch_packet(packet_t* packet, const char* type, dispatcher_query_state_t* dqstate);
 };
 

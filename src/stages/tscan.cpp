@@ -60,7 +60,7 @@ int tscan_stage_t::process_packet(packet_t *p) {
     // initialize data buffer for bulk reading. Must be aligned for
     // int accesses and a multiple of 1024 bytes long.
     // TODO: use actual pages somehow
-    int bufsize = 10*4096/sizeof(int);
+    int bufsize = 1024*4096/sizeof(int);
     int* buffer = new int[bufsize];
 
     // initiates and sets the key and data variables for the bulk reading

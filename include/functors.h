@@ -167,12 +167,11 @@ struct key_tuple_pair_t {
 
 /**
  *@brief Base comparison functor. Extend it to implement specific
- *comparisons on tuple field(s)
+ *comparisons on tuple field(s). 
  */
 
-class tuple_comparator_t {
-public:
-
+struct tuple_comparator_t {
+    
     /**
      * @brief Determines the lexicographical relationship between
      * tuples (a) and (b). Ascending sorts based on this
