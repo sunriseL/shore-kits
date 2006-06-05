@@ -98,8 +98,6 @@ class fdump_stage_t : public stage_t {
 
 protected:
 
-    static const char* DEFAULT_STAGE_NAME;
-
     tuple_buffer_t* _input_buffer;
 
     char* _filename;
@@ -107,9 +105,12 @@ protected:
     FILE* _file;
 
 public:
+
+    static const char* DEFAULT_STAGE_NAME;
+
     fdump_stage_t(packet_list_t* stage_packets,
 		  stage_container_t* stage_container,
-		  const char* stage_name=DEFAULT_STAGE_NAME);
+		  const char* stage_name);
     
     virtual ~fdump_stage_t();
     

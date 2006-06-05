@@ -73,8 +73,6 @@ class fscan_stage_t : public stage_t {
 
 protected:
 
-    static const char* DEFAULT_STAGE_NAME;
-
     char* _filename;
 
     tuple_page_t* _tuple_page;
@@ -82,13 +80,17 @@ protected:
     FILE* _file;
 
 public:
+
+    static const char* DEFAULT_STAGE_NAME;
+
     fscan_stage_t(packet_list_t* stage_packets,
 		  stage_container_t* stage_container,
-		  const char* stage_name=DEFAULT_STAGE_NAME);
+		  const char* stage_name);
     
     virtual ~fscan_stage_t();
     
 protected:
+
     virtual int  process();
     virtual void terminate_stage();
 };

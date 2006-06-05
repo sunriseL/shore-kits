@@ -56,7 +56,7 @@ public:
     
     tuple_buffer_t* output_buffer;
     tuple_filter_t* filter;
-  
+    
     /** Should be set to the stage's _stage_next_tuple field when this
 	packet is merged into the stage. Should be initialized to 0
 	when the packet is first created. */

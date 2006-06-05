@@ -141,9 +141,9 @@ protected:
 
 public:
 
-    stage_t(const char* stage_name,
-	    packet_list_t* stage_packets,
+    stage_t(packet_list_t* stage_packets,
 	    stage_container_t* stage_container,
+	    const char* stage_name,	    
 	    bool accepting_packets=false);
 
 

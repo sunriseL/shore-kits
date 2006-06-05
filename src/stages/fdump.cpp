@@ -18,7 +18,7 @@ const char* fdump_stage_t::DEFAULT_STAGE_NAME = "FDUMP_STAGE";
 fdump_stage_t::fdump_stage_t(packet_list_t* stage_packets,
 			     stage_container_t* stage_container,
 			     const char* stage_name)
-    : stage_t(stage_name, stage_packets, stage_container)
+    : stage_t(stage_packets, stage_container, stage_name)
 {
     
     // Should not need to synchronize. We are not in the
