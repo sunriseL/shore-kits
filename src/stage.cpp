@@ -181,6 +181,11 @@ stage_t::output_t stage_t::output(const tuple_t &tuple) {
 }
 
 
+void stage_t::merge_packet(packet_t* packet) {
+    packet->terminate_inputs();
+    _stage_packets->push_front(packet);
+}
+
 
 /**
  *  @brief packet should already have been removed from
@@ -200,7 +205,6 @@ void stage_t::destroy_completed_packet(packet_t* packet) {
  *  _staged_packets.
  */
 void stage_t::terminate_packet_query(packet_t* packet) {
-    packet->notify_client_of_abort();
     packet->output_buffer->send_eof();
     // TODO check for send_eof() error and delete output
     // buffer
@@ -249,9 +253,8 @@ bool stage_t::try_merge(packet_t* packet) {
     // if we are here, we detected work sharing!
 
     // merge operation...
-    packet->terminate_inputs();
-    _stage_packets->push_front(packet);
-    
+    merge_packet(packet);
+
 
     // Copy _stage_next_tuple into each packet's
     // _stage_next_tuple_on_merge field so we know how many tuples

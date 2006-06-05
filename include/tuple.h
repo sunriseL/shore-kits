@@ -323,22 +323,26 @@ public:
      *
      *  @param file The file to read from.
      *
-     *  @return true on success. false on error.
+     *  @return 0 if a page was successfully read. 1 if there thare no
+     *  more pages to read. -1 on error.
      */
 
-    bool fread_full_page(FILE *file) {
+    int fread_full_page(FILE *file) {
 
 	size_t size = page_size();
         size_t size_read = ::fread(this, 1, size, file);
 
+	if ( size_read == 0 )
+	    return 1;
+
 	if ( size_read != size )
 	    // could not read enough data
-	    return false;
+	    return -1;
 	if ( size_read != page_size() )
 	    // page on disk doesn't match
-	    return false;
+	    return -1;
 
-	return true;
+	return 0;
     }
 
 

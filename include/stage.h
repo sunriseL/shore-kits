@@ -92,6 +92,13 @@ protected:
     stage_container_t* _stage_container;
 
 
+    /** Whether this stage has been cancelled. The stage can check
+     *  this variable at various cancellation points in its process()
+     *  and return pre-maturely.
+     */
+    volatile bool _stage_cancelled;
+    
+    
     typedef enum {
 	OUTPUT_RETURN_CONTINUE = 0,
 	OUTPUT_RETURN_STOP,
@@ -105,47 +112,25 @@ protected:
     output_t output(const tuple_t &tuple);
 
 
-    void destroy_completed_packet(packet_t* packet);
-
-
-    void terminate_packet_query(packet_t* packet);
+    /** Merge the specified packet into this stage. */
+    void merge_packet(packet_t* packet);
 
 
     /**
-     *  @brief Every stage must override this method. The stage
-     *  constructor should have moved all stage-level state
-     *  (i.e. input buffers) from the packets to the stage. This
-     *  function should read from the stage-level input buffers,
-     *  invoke output() to send tuples to its set of merged packets.
+     *  @brief Process this packet. Use output() to output tuples
+     *  produced.
      *
      *  @return 0 on success. Non-zero value on unrecoverable
      *  error. If this function returns error, the stage will
      *  terminate all queries that it is currently involved in
      *  computing.
      */
-    virtual int process()=0;
+    virtual int process_packet(packet_t* packet)=0;
 
-
-    /**
-     *  @brief Every stage must override this method. It should
-     *  release stage-level resources, destroy child packets which
-     *  have not been dispatched, close (and possibly delete) buffers
-     *  from child packets which have been dispatched.
-     *
-     *  This function should be invoked by the stage's worker
-     *  thread. Otherwise, we need to worry about additional
-     *  synchronization between the caller and the worker.
-     */    
-    virtual void terminate_stage()=0;
-
-
+    
 public:
 
-    stage_t(packet_list_t* stage_packets,
-	    stage_container_t* stage_container,
-	    const char* stage_name,	    
-	    bool accepting_packets=false);
-
+    stage_t();
 
     virtual ~stage_t();
     
@@ -160,6 +145,23 @@ public:
 
 
     bool try_merge(packet_t* packet);
+
+
+    int init_stage(packet_list_t* stage_packets,
+		   stage_container_t* stage_container,
+		   const char* stage_name);
+    
+    /**
+     *  @brief Every stage must override this method. It should
+     *  release stage-level resources, destroy child packets which
+     *  have not been dispatched, close (and possibly delete) buffers
+     *  from child packets which have been dispatched.
+     *
+     *  This function should be invoked by the stage's worker
+     *  thread. Otherwise, we need to worry about additional
+     *  synchronization between the caller and the worker.
+     */    
+    void finish_stage();
 };
 
 

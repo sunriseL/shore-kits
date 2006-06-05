@@ -56,6 +56,9 @@ public:
     
     tuple_buffer_t* output_buffer;
     tuple_filter_t* filter;
+
+    tuple_buffer_t* client_buffer;
+
     
     /** Should be set to the stage's _stage_next_tuple field when this
 	packet is merged into the stage. Should be initialized to 0
@@ -76,6 +79,7 @@ public:
 		       const char* _packet_type,
                        tuple_buffer_t* _output_buffer,
                        tuple_filter_t* _filter,
+		       tuple_buffer_t* _client_buffer,
 		       bool  _merge_enabled=true);
 
 
@@ -119,7 +123,7 @@ public:
     virtual void terminate_inputs()=0;
 
 
-    void notify_client_of_abort();
+    void abort_query();
 };
 
 

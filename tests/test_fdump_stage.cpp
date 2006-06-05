@@ -14,6 +14,10 @@ using namespace qpipe;
 
 
 
+int num_fdump_tuples = -1;
+
+
+
 /**
  *  @brief Simulates a worker thread on the specified stage.
  *
@@ -36,7 +40,7 @@ void* write_tuples(void* arg)
     int_buffer->wait_init();
 
     
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < num_fdump_tuples; i++) {
 	tuple_t in_tuple((char*)&i, sizeof(int));
 	if( int_buffer->put_tuple(in_tuple) ) {
 	    TRACE(TRACE_ALWAYS, "tuple_page->append_init() returned non-zero!\n");
@@ -52,11 +56,24 @@ void* write_tuples(void* arg)
 
 
 
-int main() {
+int main(int argc, char* argv[]) {
 
     thread_init();
     
     
+    // parse output filename
+    if ( argc < 3 ) {
+	TRACE(TRACE_ALWAYS, "Usage: %s <input file> <tuple count>\n", argv[0]);
+	exit(-1);
+    }
+    const char* input_filename = argv[1];
+    num_fdump_tuples = atoi(argv[2]);
+    if ( num_fdump_tuples == 0 ) {
+	TRACE(TRACE_ALWAYS, "Invalid tuple count %s\n", argv[2]);
+	exit(-1);
+    }
+
+
     stage_container_t* sc = new stage_container_t("FDUMP_CONTAINER", new stage_factory<fdump_stage_t>);
     tester_thread_t* fdump_thread = 
 	new tester_thread_t(drive_stage, sc, "FDUMP_THREAD");

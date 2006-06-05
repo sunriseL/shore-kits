@@ -20,10 +20,12 @@ packet_t::packet_t(const char* _packet_id,
 		   const char* _packet_type,
 		   tuple_buffer_t* _output_buffer,
 		   tuple_filter_t* _filter,
+		   tuple_buffer_t* _client_buffer,
                    bool _merge_enabled)
     : merge_enabled(_merge_enabled),
       output_buffer(_output_buffer),
       filter(_filter),
+      client_buffer(_client_buffer),
       _stage_next_tuple_on_merge(0),
       _stage_next_tuple_needed(0)
 {

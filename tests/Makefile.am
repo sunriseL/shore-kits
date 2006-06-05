@@ -8,7 +8,8 @@ LDADD = ../src/libqpipe.a
 # define programs here
 bin_PROGRAMS = \
    test_trace \
-   test_fdump_stage
+   test_fdump_stage \
+   test_fscan_stage
 
 
 #\
@@ -19,6 +20,7 @@ bin_PROGRAMS = \
 
 test_trace_SOURCES = test_trace.cpp
 test_fdump_stage_SOURCES = test_fdump_stage.cpp
+test_fscan_stage_SOURCES = test_fscan_stage.cpp
 
 test_scalar_aggregate_stage_SOURCES = test_scalar_aggregate_stage.cpp
 test_aggregate_stage_SOURCES = test_aggregate_stage.cpp

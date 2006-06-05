@@ -78,17 +78,13 @@ int fscan_stage_t::process() {
     while (1)
     {
 	// read the next page of tuples
-	size_t count = _tuple_page->fread(_file);
-	if ( count == 0 ) {
+	int read_ret = _tuple_page->fread_full_page(_file);
+	if ( read_ret ==  1 )
 	    // done reading the file
 	    return 0;
-	}
-	
-	if ( count < _tuple_page->capacity() ) {
+	if ( read_ret == -1 ) {
 	    // short read! treat this as an error!
-	    TRACE(TRACE_ALWAYS, "tuple_page.fread() read %z/%z tuples\n",
-		  count,
-		  _tuple_page->capacity());
+	    TRACE(TRACE_ALWAYS, "tuple_page.fread() failed\n");
 	    return -1;
 	}
 

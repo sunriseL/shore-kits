@@ -143,7 +143,7 @@ void stage_container_t::enqueue(packet_t* packet) {
 	// try to merge with this stage
 	stage_t* stage = *it;
 	if ( stage->try_merge(packet) ) {
-	    /* packet was merged with an existing stage */
+	    /* packet was merged with this existing stage */
 	    return;
 	    // * * * END CRITICAL SECTION * * *
 	}
@@ -167,8 +167,8 @@ void stage_container_t::enqueue(packet_t* packet) {
 	// grab its merge_mutex because its mergeability status could
 	// not have changed while it was in the queue.
 	if ( cq_packet->is_mergeable(packet) ) {
-	    // merge operation...
-	    packet->terminate_inputs();
+	    // add this packet to the list of already merged packets
+	    // in the container queue
 	    cq_plist->push_back(packet);
 	    return;
 	    // * * * END CRITICAL SECTION * * *
