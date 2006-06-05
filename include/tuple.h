@@ -178,7 +178,6 @@ public:
      */
 
     static tuple_page_t *init(page_t *page, size_t tuple_size) {
-
 	// error checking
 	assert (page != NULL);
         return new (page) tuple_page_t(tuple_size);
@@ -279,8 +278,8 @@ public:
 
     /**
      *  @brief Fill this page with tuples read from the specified
-     *  file. If this page already contains tuples, we will only
-     *  modify the remainder of the page.
+     *  file. If this page already contains tuples, we only modify the
+     *  remainder of the page.
      *
      *  @param file The file to read from.
      *
@@ -318,6 +317,46 @@ public:
 
     
     /**
+     *  @brief Fill this page with tuples read from the specified
+     *  file. If this page already contains tuples, we will overwrite
+     *  them.
+     *
+     *  @param file The file to read from.
+     *
+     *  @return true on success. false on error.
+     */
+
+    bool fread_full_page(FILE *file) {
+
+	size_t size = page_size();
+        size_t size_read = ::fread(this, 1, size, file);
+
+	if ( size_read != size )
+	    // could not read enough data
+	    return false;
+	if ( size_read != page_size() )
+	    // page on disk doesn't match
+	    return false;
+
+	return true;
+    }
+
+
+    /**
+     *  @brief Drain this page to the specified file. If the page is
+     *  not full, we drain padding so a full page is written.
+     *
+     *  @param file The file to write to.
+     *
+     *  @return The number of tuples written.
+     */
+    
+    bool fwrite_full_page(FILE *file) {
+        return ::fwrite(this, 1, page_size(), file) == page_size();
+    }
+
+    
+    /**
      *  @brief Allocate a new tuple on this page and initializes
      *  'tuple' to point to it. This is a pre-assembly strategy; use
      *  it to obtain tuples in order to assemble data "in place"
@@ -347,7 +386,7 @@ public:
      *  size.
      *
      *  @return true on successful allocate and copy. False if the
-     *  page is * full
+     *  page is full
      */
 
     bool append_init(const tuple_t &tuple) {
@@ -509,9 +548,11 @@ public:
     int unique_id;
     size_t tuple_size;
 
+
     size_t page_size() const {
         return _page_size;
     }
+
 
     /**
      *  @brief Insert a tuple into this buffer. If the buffer is full
@@ -568,13 +609,15 @@ public:
      *  consumer of this buffer.
      *
      *  @return 0 on successful allocate. Non-zero if the consumer has
-     *  closed the buffer or if the current page of the buffer is
-     *  full.
+     *  closed the buffer.
      */
 
     int alloc_tuple(tuple_t &tuple) {
-        if(check_page_full())
-            return 1;
+        
+	// TODO Deal will allocation problems...
+	
+	if ( check_page_full() )
+	    return 1;
 
         return !write_page->append_mount(tuple);
     };
@@ -600,10 +643,14 @@ public:
      */
 
     tuple_page_t *get_page() {
+	
+	page_t* next_page = page_buffer.read();
+	if ( next_page == NULL )
+	    return NULL;
 
 	// cast the next page in the buffer to a page with a
 	// tuple_page_t header
-        return tuple_page_t::mount(page_buffer.read());
+        return tuple_page_t::mount(next_page);
     }
 
 
@@ -633,16 +680,6 @@ public:
     void init_buffer();
     int wait_init(bool block=true);
 
-
-    /**
-     *  @brief Send a message to the monitor only if the change is
-     *  over 10% of the last transmitted change. The last transmitted
-     *  value is stored in the lastTransmit variable. This function is
-     *  currently not implemented.
-     */
-
-    void send_update();
-  
 
     /**
      *  @brief Construct a tuple buffer that holds tuples of the

@@ -41,23 +41,34 @@ typedef list<packet_t*> packet_list_t;
 class packet_t
 {
 
+protected:
+
+    bool merge_enabled;
+
+    virtual bool is_compatible(packet_t*) {
+	return false;
+    }
+
 public:
     
-
+    char* packet_id;
+    char* packet_type;
     
-    char*  packet_id;
-    char*  packet_type;
-
     tuple_buffer_t* output_buffer;
     tuple_filter_t* filter;
   
-    // is this packet a candidate for merging?
-    bool  mergeable;    
+    /** Should be set to the stage's _stage_next_tuple field when this
+	packet is merged into the stage. Should be initialized to 0
+	when the packet is first created. */
+    unsigned int _stage_next_tuple_on_merge;
 
-    // mutex to protect the chain of merged packets
-    pthread_mutex_t merge_mutex;
-    packet_list_t   merged_packets;
-  
+    /** Should be set to _stage_next_tuple_on_merge when a packet is
+	re-enqued. This lets the stage processing it know to
+	send_eof() when its internal _stage_next_tuple counter reaches
+	this number. A value of 0 should indicate that the packet must
+	receive all tuples produced by the stage. Should be
+	initialized to 0. */
+    unsigned int _stage_next_tuple_needed;
 
 public:
 
@@ -65,35 +76,50 @@ public:
 		       const char* _packet_type,
                        tuple_buffer_t* _output_buffer,
                        tuple_filter_t* _filter,
-                       bool _mergeable=false);
+		       bool  _merge_enabled=true);
+
 
     virtual ~packet_t(void);
 
 
     /**
      *  @brief Check whether this packet can be merged with the
-     *  specified one. By default, two packets are not mergeable.
+     *  specified one.
      *
      *  @return false
      */  
     
-    virtual bool is_mergeable(packet_t *) { return false; }
+    bool is_merge_enabled() {
+	return merge_enabled;
+    }
+
+    /**
+     *  @brief Check whether this packet can be merged with the
+     *  specified one.
+     *
+     *  @return false
+     */  
+    
+    bool is_mergeable(packet_t* other) {
+	return is_merge_enabled() && is_compatible(other);
+    }
+
+
+    void disable_merging() {
+	merge_enabled = false;	
+    }
+
 
 
     /**
-     *  @brief Merge the specified packet with this one.
+     *  @brief Close input buffers, deleting them if close()
+     *  fails. This is invoked when this packet is merged with an
+     *  existing packet.
      */
+    virtual void terminate_inputs()=0;
 
-    virtual void merge(packet_t* packet);
 
-
-    /**
-     * @brief Notifies this packet that it has been terminated. It
-     * should cascade the termination to its children, if any, by
-     * closing its input buffers.
-     */
-
-    virtual void terminate()=0;
+    void notify_client_of_abort();
 };
 
 

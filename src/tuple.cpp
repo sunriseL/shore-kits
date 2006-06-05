@@ -27,6 +27,10 @@ int tuple_buffer_t::check_page_full() {
         
         // TODO: something besides malloc
         write_page = tuple_page_t::alloc(tuple_size, malloc, _page_size);
+	if ( write_page == NULL ) {
+	    return 1;
+	}
+	
         return 0;
     }
 

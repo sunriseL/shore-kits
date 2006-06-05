@@ -6,13 +6,16 @@ INCLUDES = -I$(top_srcdir)/include
 
 
 STAGES = \
+   stages/fscan.cpp \
+   stages/fdump.cpp
+
+#\
    stages/scalar_aggregate.cpp \
    stages/aggregate.cpp \
    stages/sort.cpp \
    stages/merge.cpp \
-   stages/tscan.cpp \
-   stages/fscan.cpp \
-   stages/fdump.cpp
+   stages/tscan.cpp
+
 
 TRACE = \
    trace/trace.cpp \
@@ -37,12 +40,11 @@ libqpipe_a_SOURCES = \
    page.cpp \
    tuple.cpp \
    packet.cpp \
+   stage_container.cpp \
    stage.cpp \
-   $(STAGES) \
    $(TRACE) \
-   $(UTIL) \
-   $(DISPATCHER)
+   $(UTIL)  \
+   $(STAGES)
 
-# define programs here
-#bin_PROGRAMS = test_hash_join_stage
-#test_hash_join_stage_SOURCES = hash_join_stage.cpp test
+#\
+   $(DISPATCHER)

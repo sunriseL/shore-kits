@@ -16,16 +16,13 @@ PACKET TERMINATION
     which are no longer needed.
 
 (3) Error shutdown - If we cannot allocate a buffer that we need, we
-    need a way to ABORT the entire query. This cannot be handled by
-    going to the top node and propagating shutdown down the query
-    plan. The top node may not know about intermediate packets that we
-    dispatched to perform a complex operation (i.e. a SORT dispatching
-    a FDUMP packet). We really need a way to send a shutdown to our
-    comsumer(s) and have that propagate up the query plan.
+    need a way to ABORT the entire query. This can be done by
+    terminating the current stage, and sending a message directly to
+    the client to close its input buffer.
 
 
 
-SOLUTION
+SYSTEM SHUTDOWN
 
 We add the following fields to a stage
 
@@ -39,12 +36,53 @@ packets, they see this shutdown status and simply exit rather than
 going back to the stage_queue.
 
 (2) Kill off all queries (by closing their buffers and having the
-shutdown propagate). If a packet has already dispatched its child
-packets, it should not bother freeing it. It should clean up its local
-state, destroy any packets it has not dispatched, and recursively
-invoke terminate on packets it has already send out.
+shutdown propagate). A worker thread handling packet P will learn of
+the shutdown when it tries to send anything to P's output buffer
+(alloc_tuple() or send_eof()). The worker thread will eventually
+delete all the packets in its stage, return to the container, discover
+that a shutdown is in progress, and exit.
 
 (3) Once all worker threads for a stage have exited, simply delete the
 stage. The stage destructor deletes every packet in its stage
 queue. We know that no one else can touch this queue since all workers
 have exited.
+
+
+
+PACKET PROCESSING
+
+- When a worker thread detects that an output buffer has been closed,
+  the thread should delete the buffer. It should also delete the
+  packet... DO NOT WORRY ABOUT packet's input buffer... The input
+  buffer really belongs to the stage.
+
+- When a worker thread has determined that there is no more data to
+  send a packet, it should invoke send_eof(). If send_eof() returns an
+  error, it means that the other end has already closed and the buffer
+  must be deleted. If send_eof() returns success, do not touch the
+  buffer again because it may be deleted at any time.
+
+  After invoking send_eof(), delete the packet.
+
+- When a worker thread has completed its stage's processing
+  (i.e. finished reading from its input buffer), it should return to
+  stage_t::run(). run() will walk through the packets. All packets
+  which have a non-zero mark will be re-enqueued. All packets which
+  have a zero mark will have send_eof() invoked...
+
+- output() will write the tuple to each packet and invoke send_eof()
+  on the buffers of the packets which have hit their mark. It will
+  remove and delete these packets.
+
+- Finally, if output() determines that all packets have been closed
+  pre-maturely, it invokes terminate() which must
+
+  - delete its (stage's) local state, including any child packets
+    which have not yet dispatched (delete packet + buffers).
+
+  - invoke close() on the output buffers (really our input buffer) of
+    any child packets it has dispatched
+
+    - If close() returns error, it means that the other side has sent
+      EOF. Since no other thread is holding this buffer, the buffer
+      should be deleted.

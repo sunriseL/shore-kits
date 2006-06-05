@@ -14,9 +14,10 @@
 
 
 
-class stage_t;
+/* exported datatypes */
 
 
+class stage_container_t;
 
 
 /**
@@ -24,86 +25,141 @@ class stage_t;
  *  completed) and a process_next_packet() function that worker
  *  threads can call to process the packets.
  */
-
 class stage_t {
 
 protected:
 
-    // general information about the stage
+    // synch vars
+    pthread_mutex_t _stage_lock;
+    
+
     char* _stage_name;
 
-    // synch vars
-    pthread_mutex_t stage_lock;
-    pthread_cond_t  stage_queue_packet_available;
-    
-    // stage queue
-    packet_list_t stage_queue;
-    
-    // set of packets currently being processed
-    packet_list_t merge_candidates;
-    
-    // Currently, all known forms of work sharing can be implemented
-    // with an integer "mark" that new packets can record as they
-    // merge with an existing packet. When the root packet is
-    // completely processed (i.e. when a file is completely read),
-    // incomplete packets are re-enqued. They are only processed until
-    // the new process_packet() function handling them hits their
-    // recorded mark. They can then be split
 
-
-
-    /* Each stage must override this method with the functionality of
-       that stage. */
-    virtual int process_packet(packet_t *packet)=0;
-
-    
-    void stage_queue_enqueue(packet_t* packet);
-    
-
-    packet_t* stage_queue_dequeue();
-
-
-    void set_not_mergeable(packet_t *packet);
-    
-
-    /**
-     *  @brief Write a tuple to each waiting output buffer in a chain of
-     *  packets.
+    /** The set of packets that this stage is responsible for.
      *
-     *  @return 0 on success. Non-zero on error (such as early
-     *  termination).
+     *  New packets are "merged into the stage" by prepending them to
+     *  this list. The tail packet in this list has all of its state
+     *  intact, but any packets added in front of it have had their
+     *  terminate_inputs() method called. Every packet in this list
+     *  will be fed from the input tuple buffer of the tail packet.
+     *
+     *  The enclosing container may prepend packets to this list, but
+     *  only the worker thread responsible for this stage may remove
+     *  packets. This cuts down on the amount of synchronization we
+     *  must perform.
+     *
+     *  The enclosing container merges a new packet with this set by
+     *  (1) acquiring the _stage_lock, (2) verifying that this stage's
+     *  _stage_accepting_packets flag is true, (3) verifying that the
+     *  new packet is mergeable with the head of the list, (4)
+     *  prepending the new packet to this list, and (5) releasing the
+     *  _stage_lock.
+     *
+     *  A packet's is_mergeable() method should perform read-only
+     *  operations on its packet. Furthermore, the answer should not
+     *  depend on the current state of this stage. This allows us to
+     *  implement output() by simply (1) acquiring the _stage_lock,
+     *  (2) acquiring an iterator to this list, (3) releasing the
+     *  _stage_lock, and (4) traversing the list and outputting the
+     *  tuple.
      */
+    packet_list_t* _stage_packets;
+    
 
-    int output(packet_t* packet, const tuple_t &tuple);
+    /** Whether the enclosing container can still assign packets to
+     *  this stage. Can be initialized by the constructor. If this
+     *  flag is initialized to true, it should be turned off at some
+     *  point in process() (i.e. an aggregate stage would turn this
+     *  flag off when it starts outputing results). This flag must be
+     *  protected with the _stage_lock.
+     */
+    bool _stage_accepting_packets;
+
+    
+    /** Currently, all known forms of work sharing can be implemented
+     *  by tracking the number of output tuples the stage has
+     *  produced. We do a slight variation of this here by
+     *  initializing the _stage_next_tuple counter to 1 and
+     *  incrementing it each time output() is invoked.
+     */
+    volatile unsigned int _stage_next_tuple;
+
+
+    /** This stage's container. We need access to this to re-enqueue
+     *  unfinished packets and to delete ourselves when we are done.
+     */
+    stage_container_t* _stage_container;
+
+
+    typedef enum {
+	OUTPUT_RETURN_CONTINUE = 0,
+	OUTPUT_RETURN_STOP,
+	OUTPUT_RETURN_ERROR
+    } output_t;
+
+
+    void stop_accepting_packets();
+
+
+    output_t output(const tuple_t &tuple);
+
+
+    void destroy_completed_packet(packet_t* packet);
+
+
+    void terminate_packet_query(packet_t* packet);
+
 
     /**
-     *  @brief cleans up after completing work on a packet.
+     *  @brief Every stage must override this method. The stage
+     *  constructor should have moved all stage-level state
+     *  (i.e. input buffers) from the packets to the stage. This
+     *  function should read from the stage-level input buffers,
+     *  invoke output() to send tuples to its set of merged packets.
+     *
+     *  @return 0 on success. Non-zero value on unrecoverable
+     *  error. If this function returns error, the stage will
+     *  terminate all queries that it is currently involved in
+     *  computing.
      */
+    virtual int process()=0;
 
-    void done(packet_t *packet);
+
+    /**
+     *  @brief Every stage must override this method. It should
+     *  release stage-level resources, destroy child packets which
+     *  have not been dispatched, close (and possibly delete) buffers
+     *  from child packets which have been dispatched.
+     *
+     *  This function should be invoked by the stage's worker
+     *  thread. Otherwise, we need to worry about additional
+     *  synchronization between the caller and the worker.
+     */    
+    virtual void terminate_stage()=0;
 
 
 public:
 
-    stage_t(const char* stage_name);
+    stage_t(const char* stage_name,
+	    packet_list_t* stage_packets,
+	    stage_container_t* stage_container,
+	    bool accepting_packets=false);
+
+
     virtual ~stage_t();
     
-
+    
     /**
      *  @brief Accessor for this stage's name.
      */
     const char* get_name() const { return _stage_name; }
 
 
-    /* The dispatcher can use this method to send work to this stage. */
-    void enqueue(packet_t*);
+    void run();
 
 
-    /* A worker thread for this stage should loop around this
-       function. */
-    int process_next_packet();
-
-
+    bool try_merge(packet_t* packet);
 };
 
 

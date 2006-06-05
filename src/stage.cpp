@@ -4,6 +4,8 @@
 #include "trace/trace.h"
 #include "qpipe_panic.h"
 #include "utils.h"
+#include "stage_container.h"
+
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -24,10 +26,29 @@
  *
  *  @param stage_name The name of this stage. The constructor will
  *  create a copy of this string.
+ *
+ *  @param stage_packets The set of packets that this stage is
+ *  responsible for processing.
+ *
+ *  @param stage_container The container holding this stage.
+ *
+ *  @param accepting_packets Whether this stage should allow the
+ *  container to merge more packets with it. Stages implementing
+ *  work-sharing should pass true, even though they may want to
+ *  manually disable further merges at some point in the
+ *  process_packet().
  */
 
-stage_t::stage_t(const char* stage_name) {
-
+stage_t::stage_t(const char* stage_name,
+		 packet_list_t* stage_packets,
+		 stage_container_t* stage_container,
+		 bool accepting_packets)
+    : _stage_packets(stage_packets),
+      _stage_accepting_packets(accepting_packets),
+      _stage_next_tuple(1),
+      _stage_container(stage_container)
+{
+    
     // copy stage name
     if ( asprintf(&_stage_name, "%s", stage_name) == -1 ) {
 	TRACE(TRACE_ALWAYS, "asprintf() failed on stage: %s\n",
@@ -35,275 +56,260 @@ stage_t::stage_t(const char* stage_name) {
 	QPIPE_PANIC();
     }
   
+
     // mutex that serializes the creation of the worker threads
-    pthread_mutex_init_wrapper(&stage_lock, NULL);
+    pthread_mutex_init_wrapper(&_stage_lock, NULL);
 
-    // condition variable that worker threads can wait on to
-    // deschedule until more packets arrive
-    pthread_cond_init_wrapper(&stage_queue_packet_available, NULL);
 
-    // the subclass must register itself with the dispatcher for all
-    // the packet types it wishes to handle
+    packet_list_t::iterator it;
+    for (it = stage_packets->begin(); it != stage_packets->end(); ++it) {
+        packet_t* packet = *it;
+	// Copy _stage_next_tuple (1) into each packet's
+	// _stage_next_tuple_on_merge field so we know we're done with
+	// these packets when the stage's process() method is done.
+	packet->_stage_next_tuple_on_merge = 1;
+    }
 }
 
 
 
 /**
- *  @brief Stage destructor. Deletes the main queue of the stage and
- *  send a corresponding message to the monitor. The worker_thread_t's
- *  do not have to be deleted here, since they are deleted when they
- *  exit.
+ *  @brief Stage destructor. The worker thread responsible for this
+ *  stage should remove it from the enclosing stage_container before
+ *  invoking this destructor. Otherwise, we need to worry about the
+ *  dispatcher invoking our try_merge() method while we are in the
+ *  middle of destroying ourselves.
  */
 
-stage_t::~stage_t(void) {
+stage_t::~stage_t() {
 
+    // There should be no packets in our list. We should have
+    // re-enqueued them at the end of run().
+    if ( !_stage_packets->empty() ) {
+	TRACE(TRACE_ALWAYS, "_stage_packets non-empty!\n");
+	QPIPE_PANIC();
+    }
+	
+    // destroy name
     free(_stage_name);
 
-    // There should be no worker threads accessing the packet queue when
-    // this function is called. Otherwise, we get race conditions and
-    // invalid memory accesses.
-
     // destroy synch vars    
-    pthread_mutex_destroy_wrapper(&stage_lock);
-    pthread_cond_destroy_wrapper(&stage_queue_packet_available);
+    pthread_mutex_destroy_wrapper(&_stage_lock);
+}
+
+
+
+void stage_t::stop_accepting_packets() {
+    // Need to protect flag with _stage_lock. Luckily, we should never
+    // be holding _stage_lock inside process().
+    critical_section_t cs_no_accept(&_stage_lock);
+    _stage_accepting_packets = false;
+    cs_no_accept.exit();
 }
 
 
 
 /**
- *  @brief Helper function used to add the specified packet to the
- *  stage_queue and signal a waiting worker thread, if one exists.
+ *  @brief Write a tuple to each waiting output buffer in a chain of
+ *  packets.
  *
- *  THE CALLER MUST BE HOLDING THE stage_lock MUTEX.
+ *  @return OUTPUT_RETURN_CONTINUE to indicate that we should continue
+ *  processing the query. OUTPUT_RETURN_STOP if all packets have been
+ *  serviced, sent EOFs, and deleted. OUTPUT_RETURN_ERROR on
+ *  unrecoverable error. process() should probably propagate this
+ *  error up.
  */
-void stage_t::stage_queue_enqueue(packet_t* packet) {
-
-    TRACE(TRACE_PACKET_FLOW, "Enqueuing packet %s in stage %s\n",
-	  packet->packet_id,
-	  get_name());
-
-    stage_queue.push_back(packet);
-    pthread_cond_signal_wrapper(&stage_queue_packet_available);
-}
-
-
-
-/**
- *  @brief Helper function used to remove the next packet in this
- *  stage's queue. If no packets are available, wait for one to
- *  appear.
- *
- *  THE CALLER MUST BE HOLDING THE stage_lock MUTEX.
- */
-
-packet_t* stage_t::stage_queue_dequeue(void) {
-
-    // wait for a packet to appear
-    while ( stage_queue.empty() ) {
-	pthread_cond_wait_wrapper( &stage_queue_packet_available, &stage_lock );
-    }
-
-    // remove available packet
-    packet_t* packet = stage_queue.front();
-    stage_queue.pop_front();
+stage_t::output_t stage_t::output(const tuple_t &tuple) {
     
-    TRACE(TRACE_PACKET_FLOW, "Dequeued packet %s in stage %s\n",
-	  packet->packet_id,
-	  get_name());
-  
-    return packet;
-}
-
-
-
-
-
-
-void stage_t::enqueue(packet_t* new_packet) {
-    
-    // error checking
-    if(new_packet == NULL) {
-	TRACE(TRACE_ALWAYS, "Called with NULL packet on stage %s!",
-	      get_name());
-	QPIPE_PANIC();
-    }
-  
-
-    packet_list_t::iterator it;
-    
-    
-    // * * * BEGIN CRITICAL SECTION * * *
-    critical_section_t cs(&stage_lock);
+    packet_list_t::iterator it, end;
+    unsigned int next_tuple;
     
 
-    // check for non-mergeable packets
-    if ( !new_packet->mergeable ) {
-	// We are forcing the new packet to not merge with others.
-	stage_queue_enqueue(new_packet);
-	return;
-    }
-
-
-
-
-    // try merging with packets in merge_candidates before they
-    // disappear or become non-mergeable
-    for(it = merge_candidates.begin(); it != merge_candidates.end(); ++it) {
-
-	// cand is a possible candidate for us to merge new_pack with
-        packet_t* mc_packet = *it;
-    
-	// * * * BEGIN NESTED CRITICAL SECTION * * *
-	critical_section_t cs2(&mc_packet->merge_mutex);
-        if (mc_packet->mergeable && mc_packet->is_mergeable(new_packet)) {
-            mc_packet->merge(new_packet);
-	    return;
-	}
-	// * * * END NESTED CRITICAL SECTION * * *
-    }
-    
-
-    // If we are here, we could not merge with any packet in the
-    // merge_candidates set. Don't give up. We can still try merging
-    // with a packet in the stage_queue.
-    
-    // main queue?
-    for (it = stage_queue.begin(); it != stage_queue.end(); ++it) {
-
-	// queue_pack is a possible candidate for us to merge new_pack
-	// with
-        packet_t* sq_packet = *it;
-
-	// No need to acquire queue_pack's merge mutex. No other
-	// thread can touch it until we release the stage_lock.
-	
-	// We need to check queue_pack's mergeability flag since some
-	// packets are non-mergeable from the beginning. Don't need to
-	// grab its merge_mutex because its mergeability status could
-	// not have changed while it was in the queue.
-        if (sq_packet->mergeable && sq_packet->is_mergeable(new_packet)) {
-            sq_packet->merge(new_packet);
-	    return;
-	}
-    }
-
-
-    // No work sharing detected. We can now give up and insert the new
-    // packet into the stage_queue.
-    stage_queue_enqueue(new_packet);
-    
-    // * * * END CRITICAL SECTION * * *
-}
-
-
-
-/**
- *  @brief Set the specified packet to be a non-mergeable one. This
- *  function should only be called by a worker thread for this stage,
- *  on a packet assigned to this stage.
- */
-
-void stage_t::set_not_mergeable(packet_t *packet) {
-
-    // Grab stage_lock so other threads see a consistant view of the
-    // packet (for example, threads calling enqueue()).
-    critical_section_t cs(&stage_lock);
-    packet->mergeable = false;
-    
-    // * * * END CRITICAL SECTION * * *
-}
-
-
-
-int stage_t::process_next_packet(void) {
-
-    // wait for a packet to become available
-    critical_section_t cs(&stage_lock);
-    pointer_guard_t<packet_t> packet = stage_queue_dequeue();
+    critical_section_t cs(&_stage_lock);
+    it  = _stage_packets->begin();
+    end = _stage_packets->end();
+    next_tuple = ++_stage_next_tuple;
     cs.exit();
 
+    
+    // Any new packets which merge after this point will not be
+    // receiving "tuple" this iteration.
 
-    // error checking
-    if(packet == NULL) {
-	TRACE(TRACE_ALWAYS, "Dequeued NULL packet in %s stage queue!", get_name());
-	QPIPE_PANIC();
+
+    bool packets_remaining = false;
+    tuple_t out_tup;
+
+
+    while (it != end) {
+	
+        packet_t* packet = *it;	
+	
+        // was this tuple selected?
+        if(packet->filter->select(tuple)) {
+	    if ( packet->output_buffer->alloc_tuple(out_tup) ) {
+		// alloc_tuple() failed! For now, assume that it is
+		// because the consumer closed. If it is really due to
+		// another error, we must invoke terminate_query(),
+		// possibly close the output buffer, delete the output
+		// buffer if necessary, and delete the packet.
+		it = _stage_packets->erase(it);
+		terminate_packet_query(packet);
+		continue;
+	    }
+
+	    // send tuple
+	    packet->filter->project(out_tup, tuple);
+	}
+
+	// check for early completion
+	if ( next_tuple == packet->_stage_next_tuple_needed ) {
+	    it = _stage_packets->erase(it);
+	    destroy_completed_packet(packet);
+	    continue;
+	}
+
+	// continue to next merged packet
+	++it;
+	packets_remaining = true;
+	continue;
     }
-
-    
-    // TODO: process rebinding instructions here
-  
-
-    int early_termination = process_packet(packet);
-    if(early_termination) {
-        // TODO: terminate all packets in the chain
-    }
     
     
-    // close the output buffer
-    // TODO: also close merged packets' output buffers
-    packet->output_buffer->send_eof();
-    return 0;
+    if ( packets_remaining )
+	return OUTPUT_RETURN_CONTINUE;
+    return OUTPUT_RETURN_STOP;
 }
 
 
 
-int stage_t::output(packet_t* packet, const tuple_t &tuple) {
+/**
+ *  @brief packet should already have been removed from
+ *  _staged_packets.
+ */
+void stage_t::destroy_completed_packet(packet_t* packet) {
+    packet->output_buffer->send_eof();
+    // TODO check for send_eof() error and delete output
+    // buffer
+    delete packet;
+}
 
+
+
+/**
+ *  @brief packet should already have been removed from
+ *  _staged_packets.
+ */
+void stage_t::terminate_packet_query(packet_t* packet) {
+    packet->notify_client_of_abort();
+    packet->output_buffer->send_eof();
+    // TODO check for send_eof() error and delete output
+    // buffer
+    delete packet;
+}
+
+
+
+/**
+ *  @brief Try to merge the specified packet into this stage. This
+ *  function assumes that packet has its mergeable flag set to
+ *  true.
+ *
+ *  This method relies on the stage's current state (whether
+ *  _stage_accepting_packets is true) as well as the
+ *  is_mergeable() method used to compare two packets.
+ *
+ *  @param packet The packet to try and merge.
+ *
+ *  @return true if the merge was successful. false otherwise.
+ */
+bool stage_t::try_merge(packet_t* packet) {
+ 
+   // * * * BEGIN CRITICAL SECTION * * *
+    critical_section_t cs(&_stage_lock);
+
+
+    if ( !_stage_accepting_packets ) {
+	// stage not longer in a state where it can accept new packets
+	return false;
+	// * * * END CRITICAL SECTION * * *	
+    }
+    
+
+    // The _stage_accepting_packets flag cannot change since we are
+    // holding the _stage_lock. We can also safely access
+    // _stage_packets for the same reason.
+    packet_t* head_packet = _stage_packets->front();
+    if ( !head_packet->is_mergeable(packet) ) {
+	// packet cannot share work with this stage's packet set
+	return false;
+	// * * * END CRITICAL SECTION * * *
+    }
+
+
+    // if we are here, we detected work sharing!
+
+    // merge operation...
+    packet->terminate_inputs();
+    _stage_packets->push_front(packet);
+    
+
+    // Copy _stage_next_tuple into each packet's
+    // _stage_next_tuple_on_merge field so we know how many tuples
+    // were missed by this packet.
+    packet->_stage_next_tuple_on_merge = _stage_next_tuple;
+
+    
+    // * * * END CRITICAL SECTION * * *
+    return true;
+}
+
+
+
+void stage_t::run() {
+
+
+    if ( process() ) {
+	TRACE(TRACE_ALWAYS, "process() failed!\n");
+    }
+
+	
+    // destroy local state and close input buffer(s)
+    terminate_stage();
+    
+   
+    // if we have not yet stopped accepting packets, stop now.
+    stop_accepting_packets();
+
+
+    // Walk through _stage_packets and re-enqueue the packets which
+    // have not yet completed. We should try to avoid going to the
+    // dispatcher again. We can change this later if there is a
+    // compelling reason to.
     packet_list_t::iterator it;
-    {
-        critical_section_t cs(&packet->merge_mutex);
-        it = packet->merged_packets.begin();
-    }
+    for (it = _stage_packets->begin(); it != _stage_packets->end(); ) {
 
-    // send the tuple to the output buffers
-    int failed = 1;
-    tuple_t out_tup;
+	// remove packet from list
+        packet_t* packet = *it;
+	it = _stage_packets->erase(it);
+	
+	
+	// If packet is finished...
+	if ( packet->_stage_next_tuple_on_merge == 1 ) {
+	    destroy_completed_packet(packet);
+	    continue;
+	}
 
-    // we are not considering the case the tuple not pass any filter. 
-    // In that case variable failed was untouched and incorrectly was returning fail.
-    int filter_pass = 0;
-
-    while(it != packet->merged_packets.end()) {
-        packet_t *other = *it;
-        int ret = 0;
-
-        // was this tuple selected?
-        if(other->filter->select(tuple)) {
-            ret = packet->output_buffer->alloc_tuple(out_tup);
-
-            packet->filter->project(out_tup, tuple);
-            // output succeeds unless all writes fail
-            failed &= ret;
-
-	    // the tuple passed the filter of at least one consumer
-	    filter_pass++;
-        }
-
-        // delete a finished packet?
-        if(ret != 0) {
-            set_not_mergeable(other);
-            {
-                critical_section_t cs(&packet->merge_mutex);
-                it = packet->merged_packets.erase(it);
-            }
-            
-            if(packet == other)
-                set_not_mergeable(packet);
-            else
-                delete other;
-        }
-        else
-            ++it;
-
-    }
-
-
-    // if no tuple passed filter return success
-    if (filter_pass > 0) {
-	return failed;
-    }
-    else {
-	return (0);
+	
+	// Otherwise, re-enque the packet
+	packet->_stage_next_tuple_needed =
+	    packet->_stage_next_tuple_on_merge;
+	packet->_stage_next_tuple_on_merge = 0; // reinitialize
+	
+	// Re-enqueue incomplete packet. The packet cannot come
+	// back to us since we are no longer accepting
+	// packets. CANNOT BE HOLDING _stage_lock WHEN WE MAKE
+	// THIS CALL OR WE INTRODUCE DEADLOCK.
+	_stage_container->enqueue(packet);
     }
 }
 

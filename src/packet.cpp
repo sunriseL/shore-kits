@@ -20,11 +20,12 @@ packet_t::packet_t(const char* _packet_id,
 		   const char* _packet_type,
 		   tuple_buffer_t* _output_buffer,
 		   tuple_filter_t* _filter,
-                   bool _mergeable)
-    : output_buffer(_output_buffer),
+                   bool _merge_enabled)
+    : merge_enabled(_merge_enabled),
+      output_buffer(_output_buffer),
       filter(_filter),
-      mergeable(_mergeable)
-    
+      _stage_next_tuple_on_merge(0),
+      _stage_next_tuple_needed(0)
 {
 
     // need to copy the strings since we don't own them
@@ -40,9 +41,6 @@ packet_t::packet_t(const char* _packet_id,
 	QPIPE_PANIC();
     }
 
-    pthread_mutex_init_wrapper( &merge_mutex, NULL );
-    merged_packets.push_front(this);
-    
     TRACE(TRACE_PACKET_FLOW, "Created a new packet of type %s with ID %s\n",
 	  packet_type,
 	  packet_id);
@@ -56,32 +54,36 @@ packet_t::packet_t(const char* _packet_id,
 
 packet_t::~packet_t(void) {
     
-  TRACE(TRACE_PACKET_FLOW, "Destroying packet with ID %s\n", packet_id);
+  TRACE(TRACE_PACKET_FLOW, "Destroying packet of type %s with ID %s\n",
+	packet_type,
+	packet_id);
 
-  pthread_mutex_destroy_wrapper(&merge_mutex);
+  free(packet_id);
+  free(packet_type);
+  delete filter;
 
-  TRACE(TRACE_ALWAYS, "packet_t destructor not fully implemented... need to destroy packet ID\n");
+  // the output_buffer is destroyed elsewhere since we must account
+  // for the possibility that someone is consuming from it
 }
 
 
 
 /**
- *  @brief Link the specified packet to this one.
+ *  @brief Terminate the query that this packet is a part of. This
+ *  is invoked when an unrecoverable error occurs when processing
+ *  this packet.
  */
-
-void packet_t::merge(packet_t* packet) {
+void packet_t::notify_client_of_abort() {
+    TRACE(TRACE_ALWAYS, "Invoked for packet of type %s with ID %s\n",
+	  packet_type,
+	  packet_id);
     
-  TRACE(TRACE_PACKET_FLOW, "Adding packet %s to chain of packet %s\n",
-	packet->packet_id,
-	packet_id);
-  
-  pthread_mutex_lock_wrapper(&merge_mutex);
-  
-  // add packet to head of merge set
+    // unimplemented...
 
-  merged_packets.push_front(packet);
-  
-  pthread_mutex_unlock_wrapper(&merge_mutex);
+    // Should be implemented by setting value at some bool* that is
+    // referenced by our packet as well as by closing the client's
+    // input buffer on both ends. The double close should be a
+    // synchronized operation.
 }
 
 
