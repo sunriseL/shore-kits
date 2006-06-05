@@ -26,6 +26,13 @@ class stage_container_t;
  *  threads can call to process the packets.
  */
 class stage_t {
+public:
+    struct adaptor_t {
+        virtual packet_t *get_packet()=0;
+        virtual output_t output(const tuple_t &tuple)=0;
+        virtual bool check_for_cancellation()=0;
+        virtual void abort_query()=0;
+    };
 
 protected:
 

@@ -47,14 +47,15 @@ struct merge_packet_t : public packet_t {
  */
 class merge_stage_t : public stage_t {
 public:
-    static const char *NAME;
+    static const char *DEFAULT_STAGE_NAME;
     
-    merge_stage_t()
-        : stage_t(NAME)
+    merge_stage_t(packet_list_t *packets,
+                 stage_container_t *container,
+                 const char *name)
+        : stage_t(packets, container, name, true)
     {
-	// register with the dispatcher
-	dispatcher_t::register_stage(merge_packet_t::TYPE, this);
     }
+
 
 protected:
     virtual int process_packet(packet_t *packet);

@@ -4,7 +4,12 @@
 #define __SORT_H
 
 #include "stage.h"
+#include "stages/merge.h"
 #include "dispatcher.h"
+#include <list>
+#include <map>
+#include <deque>
+#include <string>
 
 
 using namespace qpipe;
@@ -25,6 +30,7 @@ using namespace qpipe;
  *@brief Packet definition for the sort stage
  */
 struct sort_packet_t : public packet_t {
+    static const char *PACKET_TYPE;
     tuple_buffer_t *input_buffer;
     tuple_comparator_t *compare;
 
@@ -49,16 +55,36 @@ struct sort_packet_t : public packet_t {
  * merges them into a single output run.
  */
 class sort_stage_t : public stage_t {
+private:
+    // state provided by the packet
+    tuple_buffer_t *_input_buffer;
+    tuple_comparator_t *_comparator;
+    size_t _tuple_size;
+
+    
+    struct run_info_t;
+
+    typedef std::deque<std::string> name_list_t;
+    typedef std::map<int, name_list_t> run_map_t;
+    typedef std::list<run_info_t> run_list_t;
+    typedef merge_packet_t::buffer_list_t buffer_list_t;
+    
+    
 public:
-    sort_stage_t()
-        : stage_t(SORT_STAGE_NAME)
+    static const char *DEFAULT_STAGE_NAME;
+    sort_stage_t(packet_list_t *packets,
+                 stage_container_t *container,
+                 const char *name)
+        : stage_t(packets, container, name, true)
     {
-	// register with the dispatcher
-	dispatcher_t::register_stage(SORT_PACKET_TYPE, this);
     }
 
 protected:
-    virtual int process_packet(packet_t *packet);
+    virtual int process();
+    virtual void terminate_stage();
+
+private:
+    int create_sorted_run(int page_count);
 };
 
 
