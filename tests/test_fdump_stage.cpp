@@ -6,6 +6,7 @@
 #include "trace/trace.h"
 #include "qpipe_panic.h"
 
+#include "dispatcher.h"
 #include "tester_thread.h"
 
 
@@ -74,6 +75,8 @@ int main(int argc, char* argv[]) {
 
 
     stage_container_t* sc = new stage_container_t("FDUMP_CONTAINER", new stage_factory<fdump_stage_t>);
+    dispatcher_t::register_stage_container(fdump_packet_t::PACKET_TYPE, sc);
+
     tester_thread_t* fdump_thread = 
 	new tester_thread_t(drive_stage, sc, "FDUMP_THREAD");
     

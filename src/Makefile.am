@@ -43,8 +43,6 @@ libqpipe_a_SOURCES = \
    packet.cpp \
    stage_container.cpp \
    $(TRACE) \
+   $(DISPATCHER) \
    $(UTIL)  \
    $(STAGES)
-
-#\
-   $(DISPATCHER)

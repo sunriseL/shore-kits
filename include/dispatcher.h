@@ -52,7 +52,8 @@ protected:
     ~dispatcher_t();
     
     // methods
-    int _register_stage_container(const char* packet_type, stage_container_t* sc);
+    void _register_stage_container(const char* packet_type, stage_container_t* sc);
+    void _dispatch_packet(packet_t* packet);
     
     
     static dispatcher_t* _instance;
