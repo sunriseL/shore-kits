@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
 	new fdump_packet_t("FDUMP_PACKET", &signal_buffer, &int_buffer, &signal_buffer, input_filename);
     
     
-    sc->enqueue(packet);
+    dispatcher_t::dispatch_packet(packet);
   
   
     tuple_t output;
