@@ -69,7 +69,7 @@ packet_t::~packet_t(void) {
 }
 
 
-
+#ifdef DECLARED_IN_HEADER
 /**
  *  @brief Terminate the query that this packet is a part of. This
  *  is invoked when an unrecoverable error occurs when processing
@@ -81,7 +81,7 @@ void packet_t::abort_query() {
 	  packet_id);
     // need to terminate _client_buffer
 }
-
+#endif
 
 
 #include "namespace.h"

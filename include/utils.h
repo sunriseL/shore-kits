@@ -10,6 +10,201 @@
 /* exported datatypes */
 
 using qpipe::tuple_buffer_t;
+using qpipe::page_t;
+using qpipe::tuple_page_t;
+
+/**
+ * @brief A generic pointer guard base class. An action will be
+ * performed exactly once on the stored pointer, either with an
+ * explicit call to done() or when the guard goes out of scope,
+ * whichever comes first.
+ *
+ * This is very similar to the auto_ptr class except:
+ * - the "auto" part is configurable.
+ * - it is unknown whether passing to it functions by value is safe
+ */
+template <class T, class Child>
+class pointer_guard_base_t {
+    T *_ptr;
+
+public:
+    typedef pointer_guard_base_t<T, Child> Base;
+    struct temp_ref_t {
+        T *_ptr;
+        temp_ref_t(T *ptr)
+            : _ptr(ptr)
+        {
+        }
+    };
+    
+public:
+    pointer_guard_base_t(T *ptr)
+        : _ptr(ptr)
+    {
+    }
+    pointer_guard_base_t(const temp_ref_t &other)
+        : _ptr(other._ptr)
+    {
+    }
+
+    pointer_guard_base_t &operator=(const temp_ref_t &other) {
+        assign(other._ptr);
+        return *this;
+    }
+
+    T &operator *() {
+        return *_ptr;
+    }
+    operator T*() {
+        return _ptr;
+    }
+    T *operator ->() {
+        return _ptr;
+    }
+    
+    /**
+     * @brief Notifies this guard that its action should be performed
+     * now rather than at destruct time.
+     */
+    void done() {
+        if(_ptr) {
+            typename Child::Action()(_ptr);
+            _ptr = NULL;
+        }
+    }
+    
+    /**
+     * @brief Notifies this guard that its services are no longer
+     * needed because some other entity has assumed ownership of the
+     * pointer. 
+     */
+    T *release() {
+        T *ptr = _ptr;
+        _ptr = NULL;
+        return ptr;
+    }
+
+    void assign(T *ptr) {
+        done();
+        _ptr = ptr;
+    }
+    
+    ~pointer_guard_base_t() {
+        done();
+    }
+};
+
+/**
+ * @brief Ensures that a pointer allocated with a call to operator
+ * new() gets deleted
+ */
+template <class T>
+struct pointer_guard_t : public pointer_guard_base_t<T, pointer_guard_t<T> > {
+    pointer_guard_t(T *ptr)
+        : pointer_guard_base_t<T, pointer_guard_t<T> >(ptr)
+    {
+    }
+    
+    struct Action {
+        void operator()(T *ptr) {
+            delete ptr;
+        }
+    };
+
+    pointer_guard_t &operator=(const typename pointer_guard_t::temp_ref_t &ref) {
+        assign(ref._ptr);
+        return *this;
+    }
+};
+
+/**
+ * @brief Ensures that an array allocated with a call to operator
+ * new() gets deleted
+ */
+template <class T>
+struct array_guard_t : public pointer_guard_base_t<T, array_guard_t<T> > {
+    array_guard_t(T *ptr)
+        : pointer_guard_base_t<T, array_guard_t<T> >(ptr)
+    {
+    }
+    
+    struct Action {
+        void operator()(T *ptr) {
+            delete [] ptr;
+        }
+    };
+
+    array_guard_t &operator=(const typename array_guard_t::temp_ref_t &ref) {
+        assign(ref._ptr);
+        return *this;
+    }
+};
+
+/**
+ * @brief Ensures that a page allocated with malloc+placement-new gets freed
+ */
+struct page_guard_t : public pointer_guard_base_t<tuple_page_t, page_guard_t> {
+    page_guard_t(tuple_page_t *ptr)
+        : pointer_guard_base_t<tuple_page_t, page_guard_t>(ptr)
+    {
+    }
+    
+    struct Action {
+        void operator()(tuple_page_t *ptr) {
+            free(ptr);
+        }
+    };
+
+    page_guard_t &operator=(const page_guard_t::temp_ref_t &ref) {
+        assign(ref._ptr);
+        return *this;
+    }
+};
+
+/**
+ * @brief Ensures that a list of pages allocated with malloc+placement-new is freed 
+ */
+struct page_list_guard_t : public pointer_guard_base_t<page_t, page_list_guard_t> {
+    page_list_guard_t(page_t *ptr=NULL)
+        : pointer_guard_base_t<page_t, page_list_guard_t>(ptr)
+    {
+    }
+    struct Action {
+        void operator()(page_t *ptr) {
+            while(ptr) {
+                page_t *page = ptr;
+                ptr = page->next;
+                free(page);
+            }
+        }
+    };
+    
+    void append(page_t *ptr) {
+        assert(ptr);
+        ptr->next = release();
+        assign(ptr);
+    }
+
+    page_list_guard_t &operator=(const page_list_guard_t::temp_ref_t &ref) {
+        assign(ref._ptr);
+        return *this;
+    }
+};
+
+/**
+ * @brief Ensures that a file gets closed
+ */
+struct file_guard_t : public pointer_guard_base_t<FILE, file_guard_t> {
+    file_guard_t(FILE *ptr)
+        : pointer_guard_base_t<FILE, file_guard_t>(ptr)
+    {
+    }
+    struct Action {
+        void operator()(FILE *ptr) {
+            fclose(ptr);
+        }
+    };
+};
 
 /**
  *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
@@ -47,130 +242,6 @@ private:
     // no copying
     buffer_guard_t &operator=(const buffer_guard_t &other);
     buffer_guard_t(const buffer_guard_t &other);
-};
-
-
-/**
- *  @brief A helper class that automatically deletes a pointer when
- *  'this' goes out of scope.
- */
-
-template <typename T>
-struct pointer_guard_t {
-    T *ptr;
-    pointer_guard_t(T *p)
-        : ptr(p)
-    {
-    }
-
-    ~pointer_guard_t() {
-        if(ptr)
-            delete ptr;
-    }
-    operator T*() {
-        return ptr;
-    }
-    
-    T *operator ->() {
-        return ptr;
-    }
-};
-
-
-
-/**
- *  @brief A helper class that automatically deletes an array when
- *  'this' goes out of scope.
- */
-
-template <typename T>
-struct array_guard_t {
-    T *ptr;
-    array_guard_t(T *p)
-        : ptr(p)
-    {
-    }
-
-    ~array_guard_t() {
-        if(ptr)
-            delete [] ptr;
-    }
-    operator T*() {
-        return ptr;
-    }
-    
-    T *operator ->() {
-        return ptr;
-    }
-};
-
-
-
-/**
- *  @brief A helper class for operations involving setup and takedown
- *  phases that must be matched (ie mutex lock/unlock, malloc/free,
- *  etc).
- *
- *  This class performs "initialization" when constructed, and asserts
- *  that "cleanup" has been performed before it goes out of scope
- *  (usually by returning from a function call). Cleanup must be
- *  performed exactly once by calling one of the "exit" functions.
- *
- *  The "State" template must provide:
- *  - typedef called "Param" that specifies the state to be protected
- *  - constructor that accepts a "Param"
- *  - init() method that performs initialization
- *  - cleanup() method that performs takedown
- */
-
-template<class State>
-class init_cleanup_t {
-public:
-    init_cleanup_t(const typename State::Param &param) 
-        : _state(param)
-    {
-        init();
-    }
-    
-    init_cleanup_t(const State &state)
-        : _state(state)
-    {
-        init();
-    }
-
-    template <class T>
-    T &exit(T &value) {
-        exit();
-        return value;
-    }
-
-    template <class T>
-    const T &exit(const T &value) {
-        exit();
-        return value;
-    }
-
-    void exit() {
-        assert(_active);
-        _active = false;
-        _state.cleanup();
-    }
-    
-    ~init_cleanup_t() {
-        assert(!_active);
-    }
-    
-private:
-    // prevent copying
-    init_cleanup_t(const init_cleanup_t &);
-    init_cleanup_t &operator=(const init_cleanup_t &);
-    
-    void init() {
-        _state.init();
-        _active = true;
-    }
-    State _state;
-    bool _active;
 };
 
 #endif

@@ -33,6 +33,8 @@ struct fdump_packet_t : public packet_t {
     
     char* _filename;
 
+    notify_t *_notifier;
+
 
     /**
      *  @brief FDUMP packet constructor.
@@ -54,11 +56,12 @@ struct fdump_packet_t : public packet_t {
     fdump_packet_t(char* packet_id,
 		   tuple_buffer_t* output_buffer,
 		   tuple_buffer_t* input_buffer,
-		   tuple_buffer_t* client_buffer,
-		   const char*     filename)
+                   tuple_buffer_t* client_buffer,
+		   const char*     filename,
+                   notify_t *notifier=NULL)
 	: packet_t(packet_id, PACKET_TYPE, output_buffer,
-		   new tuple_filter_t(), client_buffer),
-	  _input_buffer(input_buffer)
+                   new tuple_filter_t(), client_buffer),
+	  _input_buffer(input_buffer), _notifier(notifier)
     {
 	if ( asprintf(&_filename, "%s", filename) == -1 ) {
 	    TRACE(TRACE_ALWAYS, "asprintf() failed on filename %s\n",
@@ -72,6 +75,10 @@ struct fdump_packet_t : public packet_t {
 	// may have deleted _filename earlier in terminate_inputs()
 	if (_filename != NULL)
 	    free(_filename);
+
+        // let it be known that the file dump is finished
+        if(_notifier)
+            _notifier->notify();
     }
 
 
@@ -105,7 +112,6 @@ public:
     fdump_stage_t() { }
 
     virtual ~fdump_stage_t() { }
-    
 protected:
 
     virtual int process_packet();

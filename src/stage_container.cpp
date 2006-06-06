@@ -431,9 +431,7 @@ void stage_container_t::run() {
 
     
  	pointer_guard_t <stage_t> stage = _stage_maker->create_stage();
-	stage_adaptor_t* sa = new stage_adaptor_t(this, packets);
-	assert(sa != NULL);
-	sa->run_stage(stage);
+	stage_adaptor_t(this, packets).run_stage(stage);
 	
 
 	// TODO: check for container shutdown
