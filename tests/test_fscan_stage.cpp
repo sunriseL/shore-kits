@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
     stage_container_t* sc = new stage_container_t("FSCAN_CONTAINER", new stage_factory<fscan_stage_t>);
     dispatcher_t::register_stage_container(fscan_packet_t::PACKET_TYPE, sc);
     
-    tester_thread_t* fscan_thread = 
+    tester_thread_t* fscan_thread =
 	new tester_thread_t(drive_stage, sc, "FSCAN_THREAD");
     
     if ( thread_create( NULL, fscan_thread ) ) {
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
 	new fscan_packet_t("FSCAN_PACKET", &int_buffer, new tuple_filter_t(), &int_buffer, input_filename);
     
     
-    sc->enqueue(packet);
+    dispatcher_t::dispatch_packet(packet);
   
   
     tuple_t output;
