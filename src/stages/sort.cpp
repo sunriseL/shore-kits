@@ -348,6 +348,10 @@ int sort_stage_t::process_packet(adaptor_t *a) {
     // wait for the output buffer from the final merge to arrive
     tuple_buffer_t *merge_output;
     pthread_join_wrapper(tid, merge_output);
+    if(merge_output == NULL) {
+        TRACE(TRACE_ALWAYS, "Merge failed. Bailing out early.");
+        return 1;
+    }
     
     // transfer the output of the last merge to the stage output
     tuple_t out;

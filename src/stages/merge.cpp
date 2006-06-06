@@ -5,8 +5,13 @@
 
 using std::list;
 
-void merge_packet_t::terminate() {
+void merge_packet_t::terminate_inputs() {
     // TODO: close the input buffers
+    for(buffer_list_t::iterator it=input_buffers.begin(); it != input_buffers.end(); ++it) {
+        tuple_buffer_t *buf = *it;
+        buf->close();
+        // TODO: delete the buffer if the close fails
+    }
 }
 
 /**
@@ -36,91 +41,74 @@ void merge_packet_t::terminate() {
  * the heap by up to 2x and make it even less attractive than shown
  * above.
  */
-struct buffer_head_t {
-    tuple_buffer_t *buffer;
-    tuple_comparator_t *cmp;
-    key_tuple_pair_t item;
-    buffer_head_t(tuple_buffer_t *buf, tuple_comparator_t *c) {
-        buffer = buf;
-        cmp = c;
-        buffer->init_buffer();
+merge_stage_t::buffer_head_t::buffer_head_t(tuple_buffer_t *buf,
+                                            tuple_comparator_t *c) {
+    buffer = buf;
+    cmp = c;
+    buffer->init_buffer();
         
-    }
-    bool has_next() {
-        tuple_t tuple;
-        if(!buffer->get_tuple(tuple))
-            return false;
+}
 
-        // update the head
-        item.key = cmp->make_key(tuple);
-        item.data = tuple.data;
-        return true;
-    }
-};
 
-struct head_less_t {
-    tuple_comparator_t *comparator;
-    head_less_t(tuple_comparator_t *cmp) {
-        comparator = cmp;
-    }
-    bool operator()(const buffer_head_t &a, const buffer_head_t &b) {
-        return comparator->compare(a.item, b.item);
-    }
-};
+bool merge_stage_t::buffer_head_t::has_next() {
+    tuple_t tuple;
+    if(!buffer->get_tuple(tuple))
+        return false;
 
-typedef list<buffer_head_t> head_list_t;
+    // update the head
+    item.key = cmp->make_key(tuple);
+    item.data = tuple.data;
+    return true;
+}
 
 
 
 /**
  * @brief Inserts an item into the list in ascending order
  */
-static void insert_sorted(head_list_t &buffers,
-                          const buffer_head_t &head,
-                          tuple_comparator_t *comparator)
+void merge_stage_t::insert_sorted(const buffer_head_t &head)
 {
     // find the right position
-    head_list_t::iterator it=buffers.begin();
-    while(it != buffers.end() && comparator->compare(it->item, head.item) < 0)
+    head_list_t::iterator it=_buffers.begin();
+    while(it != _buffers.end() && _comparator->compare(it->item, head.item) < 0)
         ++it;
     
     // insert
-    buffers.insert(it, head);
+    _buffers.insert(it, head);
 }
 
-const char *merge_packet_t::TYPE = "Merge";
-const char *merge_stage_t::NAME = "Merge";
+const char *merge_packet_t::PACKET_TYPE = "Merge";
+const char *merge_stage_t::DEFAULT_STAGE_NAME = "Merge";
 
-int merge_stage_t::process_packet(packet_t *p) {
-    merge_packet_t *packet = (merge_packet_t *)p;
+int merge_stage_t::process_packet() {
+    merge_packet_t *packet = (merge_packet_t *)_adaptor->get_packet();
 
     typedef merge_packet_t::buffer_list_t buffer_list_t;
     typedef buffer_list_t::iterator iterator;
 
-    tuple_comparator_t *comparator = packet->comparator;
+    _comparator = packet->comparator;
     size_t tuple_size = packet->output_buffer->tuple_size;
     buffer_list_t &inputs = packet->input_buffers;
     
     // get the input buffers and perform the initial sort
-    head_list_t buffers;
     for(iterator it=inputs.begin(); it != inputs.end(); ++it) {
-        buffer_head_t head(*it, comparator);
+        buffer_head_t head(*it, _comparator);
         if(head.has_next())
-            insert_sorted(buffers, head, comparator);
+            insert_sorted(head);
     }
 
     // always output the smallest tuple
     tuple_t tuple(NULL, tuple_size);
-    while(buffers.size()) {
-        buffer_head_t head = buffers.front();
-        buffers.pop_front();
+    while(_buffers.size()) {
+        buffer_head_t head = _buffers.front();
+        _buffers.pop_front();
         tuple.data = head.item.data;
-        if(output(packet, tuple))
+        if(_adaptor->output(tuple))
             return 1;
 
         // put it back?
         if(head.has_next())
-            insert_sorted(buffers, head, comparator);
+            insert_sorted(head);
     }
 
     // done!

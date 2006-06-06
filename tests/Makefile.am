@@ -8,6 +8,7 @@ LDADD = ../src/libqpipe.a
 # define programs here
 bin_PROGRAMS = \
    test_trace \
+   test_merge_stage \
    test_fdump_stage \
    test_fscan_stage
 

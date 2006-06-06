@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 #include <algorithm>
+#include "stage_container.h"
 
 using namespace qpipe;
 
@@ -21,12 +22,12 @@ using std::pair;
  */
 void* drive_stage(void* arg)
 {
-    stage_t *stage = (stage_t *)arg;
-    while(1) {
-        stage->process_next_packet();
-    }
-    return NULL;
+  stage_container_t* sc = (stage_container_t*)arg;
+  sc->run();
+
+  return NULL;
 }
+
 
 typedef vector<int> input_list_t;
 typedef pair<tuple_buffer_t*, input_list_t> write_info_t;
@@ -73,8 +74,9 @@ int main() {
 
     thread_init();
 
-    merge_stage_t *stage = new merge_stage_t();
-    tester_thread_t* merge_thread = new tester_thread_t(drive_stage, stage, "MERGE THREAD");
+    stage_container_t* sc = new stage_container_t("MERGE_CONTAINER",
+                                                  new stage_factory<merge_stage_t>);
+    tester_thread_t* merge_thread = new tester_thread_t(drive_stage, sc, "MERGE THREAD");
     if ( thread_create( NULL, merge_thread ) ) {
         TRACE(TRACE_ALWAYS, "thread_create failed\n");
         QPIPE_PANIC();
@@ -123,12 +125,13 @@ int main() {
 
     merge_packet_t* packet = new merge_packet_t("test merge",
                                                 &output_buffer,
+                                                &output_buffer,
                                                 input_buffers,
                                                 filter,
                                                 merge_factor,
                                                 &comparator);
 
-    stage->enqueue(packet);
+    sc->enqueue(packet);
     
     tuple_t output;
     output_buffer.init_buffer();

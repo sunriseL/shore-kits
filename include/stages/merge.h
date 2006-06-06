@@ -25,11 +25,11 @@ struct merge_packet_t : public packet_t {
     tuple_comparator_t* comparator;
 
     merge_packet_t(char *packet_id,
-                  tuple_buffer_t *out_buffer,
+                   tuple_buffer_t *out_buffer,
                    tuple_buffer_t *client_buffer,
-                  const buffer_list_t &in_buffers,
-                  tuple_filter_t *filt,
-                  size_t factor,
+                   const buffer_list_t &in_buffers,
+                   tuple_filter_t *filt,
+                   size_t factor,
                    tuple_comparator_t *cmp)
 	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, client_buffer),
           input_buffers(in_buffers),
@@ -47,11 +47,27 @@ struct merge_packet_t : public packet_t {
  * output run.
  */
 class merge_stage_t : public stage_t {
+private:
+    struct buffer_head_t {
+        tuple_buffer_t *buffer;
+        tuple_comparator_t *cmp;
+        key_tuple_pair_t item;
+        buffer_head_t(tuple_buffer_t *buf, tuple_comparator_t *c);
+        bool has_next();
+    };
+    typedef list<buffer_head_t> head_list_t;
+
+    head_list_t _buffers;
+    tuple_comparator_t *_comparator;
+    
 public:
     static const char *DEFAULT_STAGE_NAME;
     
 protected:
-    virtual int process_packet(packet_t *packet);
+    virtual int process_packet();
+
+private:
+    void insert_sorted(const buffer_head_t &head);
 };
 
 
