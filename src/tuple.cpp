@@ -79,6 +79,7 @@ int tuple_buffer_t::wait_for_input() {
  */
 
 bool tuple_buffer_t::get_tuple(tuple_t &rec) {
+
     // make sure there is a valid page
     if(wait_for_input())
         return false;

@@ -5,7 +5,9 @@ INCLUDES = -I$(top_srcdir)/include
 
 
 
-STAGES = \
+STAGES = 
+
+#\
    stages/sort.cpp \
    stages/fscan.cpp \
    stages/fdump.cpp
@@ -41,7 +43,6 @@ libqpipe_a_SOURCES = \
    tuple.cpp \
    packet.cpp \
    stage_container.cpp \
-   stage.cpp \
    $(TRACE) \
    $(UTIL)  \
    $(STAGES)

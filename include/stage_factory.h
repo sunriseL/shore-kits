@@ -16,9 +16,11 @@
 
 /* exported datatypes */
 
-struct stage_factory_t {
+class stage_container_t;
 
-  virtual stage_t* create_stage(packet_list_t* packets, stage_container_t* sc)=0;
+
+struct stage_factory_t {
+  virtual stage_t* create_stage()=0;
   virtual ~stage_factory_t() { }
 
 };
@@ -39,8 +41,8 @@ struct stage_factory_t {
 template<class STAGE>
 struct stage_factory : public stage_factory_t {
 
-  virtual stage_t* create_stage(packet_list_t* packets, stage_container_t* sc) {
-    return new STAGE(packets, sc, STAGE::DEFAULT_STAGE_NAME);
+  virtual stage_t* create_stage() {
+    return new STAGE();
   }
 
   virtual ~stage_factory() { }

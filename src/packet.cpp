@@ -75,17 +75,11 @@ packet_t::~packet_t(void) {
  *  is invoked when an unrecoverable error occurs when processing
  *  this packet.
  */
-void packet_t::notify_client_of_abort() {
+void packet_t::abort_query() {
     TRACE(TRACE_ALWAYS, "Invoked for packet of type %s with ID %s\n",
 	  packet_type,
 	  packet_id);
-    
-    // unimplemented...
-
-    // Should be implemented by setting value at some bool* that is
-    // referenced by our packet as well as by closing the client's
-    // input buffer on both ends. The double close should be a
-    // synchronized operation.
+    // need to terminate _client_buffer
 }
 
 

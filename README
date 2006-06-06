@@ -1,8 +1,15 @@
 
 
+Moved stop_accepting_packets() into adaptor since we must check the
+flag AND add to the packet list in one critical section. We move
+_stage_next_tuple counter into the adaptor since we must increment it
+whenever we invoke output().
+
+
+
 PACKET TERMINATION
 
-(1) Query shutdown - need to propagate shutdown down the query
+(1) Query shutdown - need to propagate shutdown dow n the query
     plan tree. We must distinguish between two cases
 
     - shutting down a child that is running (we can simply close the
