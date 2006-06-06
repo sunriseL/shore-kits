@@ -4,6 +4,7 @@
 #define _DISPATCHER_H
 
 #include "thread.h"
+#include "stage_container.h"
 #include "util/static_hash_map_struct.h"
 
 
@@ -51,7 +52,8 @@ protected:
     ~dispatcher_t();
     
     // methods
-    int do_register_stage(const char* packet_type, stage_t* stage);
+    int _register_stage_container(const char* packet_type, stage_container_t* sc);
+    
     
     static dispatcher_t* _instance;
     static dispatcher_t* instance() {
@@ -63,9 +65,8 @@ protected:
     
 public:
 
-    static int register_stage (const char* packet_type, stage_t* stage);
-    static void dispatch_packet(packet_t *packet, const char *type);
-    //    static void dispatch_packet(packet_t* packet, const char* type, dispatcher_query_state_t* dqstate);
+    static void register_stage_container(const char* packet_type, stage_container_t* sc);
+    static void dispatch_packet(packet_t* packet);
 };
 
 

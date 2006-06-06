@@ -132,7 +132,7 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                                it->data());
 
         // dispatch the packet
-        dispatcher_t::dispatch_packet(p, fscan_packet_t::PACKET_TYPE);
+        dispatcher_t::dispatch_packet(p);
 
         // store the output buffer
         fscan_buffers.push_back(buf);
@@ -154,7 +154,7 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                             _comparator);
 
     // fire it off
-    dispatcher_t::dispatch_packet(mp, merge_packet_t::PACKET_TYPE);
+    dispatcher_t::dispatch_packet(mp);
 
     // last merge run? Send it to the output buffer instead of fdump
     if(_sorting_finished && _current_merges.empty() && _finished_merges.size() == 1) {
@@ -174,7 +174,7 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                             _adaptor->get_packet()->client_buffer,
                             merge_out,
                             file_name.data());
-    dispatcher_t::dispatch_packet(fp, fdump_packet_t::PACKET_TYPE);
+    dispatcher_t::dispatch_packet(fp);
     _current_merges.push_back(run_info_t(level+1, file_name, fdump_out));
 }
 

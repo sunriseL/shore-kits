@@ -14,6 +14,10 @@ using namespace qpipe;
 
 
 
+dispatcher_t* dispatcher_t::_instance = NULL;
+
+
+
 /* internal helper functions */
 
 int string_comparator (const void* key1, const void* key2);
@@ -43,14 +47,13 @@ dispatcher_t::~dispatcher_t() {
  *  their constructors should execute in the context of the root
  *  thread.
  */
-int dispatcher_t::do_register_stage(const char* packet_type, stage_t* stage) {
+void dispatcher_t::_register_stage(const char* packet_type, stage_container_t* sc) {
 
   
   // We eventually want multiple stages willing to perform SORT's. But
   // then we need policy/cost model to determine which SORT stage to
   // use when. For now, restrict to one stage per type.
   if ( !static_hash_map_find( &stage_directory, packet_type, NULL, NULL ) ) {
-    TRACE(TRACE_ALWAYS, "Only one stage per type currenrly supported\n");
     TRACE(TRACE_ALWAYS, "Trying to register duplicate stage for type %s\n",
 	  packet_type);
     QPIPE_PANIC();
@@ -61,30 +64,55 @@ int dispatcher_t::do_register_stage(const char* packet_type, stage_t* stage) {
   static_hash_node_t node = (static_hash_node_t)malloc(sizeof(*node));
   if ( node == NULL ) {
     TRACE(TRACE_ALWAYS, "malloc() failed on static_hash_node_t\n");
-    return -1;
+    QPIPE_PANIC();
   }
 
   char* ptcopy;
   if ( asprintf(&ptcopy, "%s", packet_type) == -1 ) {
     TRACE(TRACE_ALWAYS, "asprintf() failed\n");
     free(node);
-    return -1;
+    QPIPE_PANIC();
   }
 
   
   // add to hash map
-  static_hash_map_insert( &stage_directory, ptcopy, stage, node );
-  return 0;
+  static_hash_map_insert( &stage_directory, ptcopy, sc, node );
 }
 
 
-dispatcher_t* dispatcher_t::_instance = NULL;
 
-int dispatcher_t::register_stage(const char* packet_type, stage_t* stage) {
-  return instance()->do_register_stage(packet_type, stage);
+/**
+ *  @brief THIS FUNCTION IS NOT THREAD-SAFE. It should not have to be
+ *  since stages should register themselves in their constructors and
+ *  their constructors should execute in the context of the root
+ *  thread.
+ */
+void dispatcher_t::_dispatch_packet(packet_t* packet) {
+
+  
+  void* sc;
+  if ( static_hash_map_find( &stage_directory, packet->packet_type, &sc, NULL ) ) {
+    TRACE(TRACE_ALWAYS, "Packet type %s unregistered\n",
+	  packet->packet_type);
+    QPIPE_PANIC();
+  }
+  
+  
+  stage_container_t* stage_container = (stage_container_t*)sc;
+  stage_container->enqueue(packet);
 }
 
 
+
+void dispatcher_t::register_stage_container(const char* packet_type, stage_container_t* sc) {
+  instance()->_register_stage(packet_type, stage);
+}
+
+
+
+void dispatcher_t::dispatch_packet(packet_t* packet) {
+  instance()->_dispatch_packet(packet);
+}
 
 
 
