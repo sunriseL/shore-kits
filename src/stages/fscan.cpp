@@ -15,52 +15,6 @@ const char* fscan_stage_t::DEFAULT_STAGE_NAME = "FSCAN_STAGE";
 
 
 
-fscan_stage_t::fscan_stage_t(packet_list_t* stage_packets,
-			     stage_container_t* stage_container,
-			     const char* stage_name)
-    : stage_t(stage_packets, stage_container, stage_name)
-{
-    
-    // Should not need to synchronize. We are not in the
-    // stage_container_t's stage set until we are full
-    // constructed. No other threads can touch our data.
-    
-    // Tail packet still has inputs intact. Move it into the
-    // stage.
-    fscan_packet_t* packet = (fscan_packet_t*)stage_packets->back();
-    
-
-    if ( asprintf(&_filename, "%s", packet->_filename) == -1 ) {
-	TRACE(TRACE_ALWAYS, "asprintf() failed on stage: %s\n",
-	      stage_name);
-	QPIPE_PANIC();
-    }
-
-    
-    _file = fopen(_filename, "r");
-    if ( _file == NULL ) {
-	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n", _filename);
-	QPIPE_PANIC();
-    }
-    
-
-    _tuple_page =
-	tuple_page_t::alloc(packet->output_buffer->tuple_size, malloc);
-    if ( _tuple_page == NULL ) {
-	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
-	QPIPE_PANIC();
-    }
-}
-
-
-
-fscan_stage_t::~fscan_stage_t() {
-    // All resources allocated in the constructor should have been
-    // freed in terminate_stage().
-}
-
-
-
 /**
  *  @brief Read the file specified by fscan_packet_t p.
  *
@@ -68,9 +22,46 @@ fscan_stage_t::~fscan_stage_t() {
  *  should terminate all queries it is processing.
  */
 
-int fscan_stage_t::process() {
+int fscan_stage_t::process_packet() {
 
-    // If we have FSCAN working sharing enabled, we could be accepting
+    adaptor_t* adaptor = _adaptor;
+    fscan_packet_t* packet = (fscan_packet_t*)adaptor->get_packet();
+
+
+    char* filename = packet->_filename;
+    FILE* file = fopen(filename, "r");
+    if ( file == NULL ) {
+	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n", filename);
+	return -1;
+    }
+    
+
+    tuple_page_t* tuple_page =
+	tuple_page_t::alloc(packet->output_buffer->tuple_size, malloc);
+    if ( tuple_page == NULL ) {
+	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
+	if ( fclose(file) )
+	    TRACE(TRACE_ALWAYS, "fclose() failed on %s\n", filename);
+	return -1;
+    }
+
+    int read_ret = read_file(adaptor, file, tuple_page);
+
+    free(tuple_page);
+    if ( fclose(file) ) {
+	TRACE(TRACE_ALWAYS, "fclose() failed on %s\n", filename);
+	return -1;
+    }
+
+    return read_ret;
+}
+
+
+
+int fscan_stage_t::read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple_page) {
+
+
+   // If we have FSCAN working sharing enabled, we could be accepting
     // packets now. We would like to avoid doing so when we start
     // sending tuples to output().
     bool accepting_packets = true;
@@ -78,13 +69,15 @@ int fscan_stage_t::process() {
     while (1)
     {
 	// read the next page of tuples
-	int read_ret = _tuple_page->fread_full_page(_file);
-	if ( read_ret ==  1 )
+	int read_ret = tuple_page->fread_full_page(file);
+	if ( read_ret ==  1 ) {
 	    // done reading the file
 	    return 0;
+	}
+
 	if ( read_ret == -1 ) {
 	    // short read! treat this as an error!
-	    TRACE(TRACE_ALWAYS, "tuple_page.fread() failed\n");
+	    TRACE(TRACE_ALWAYS, "tuple_page_t::fread() failed\n");
 	    return -1;
 	}
 
@@ -93,25 +86,25 @@ int fscan_stage_t::process() {
 	// tuples. Any packet accepted after this point will miss some
 	// of the data we are reading.
 	if (accepting_packets) {
-	    stop_accepting_packets();
+	    adaptor->stop_accepting_packets();
 	    accepting_packets = false;
 	}
 	   
 
 	// output() each tuple in the page
 	tuple_page_t::iterator it;
-	for (it = _tuple_page->begin(); it != _tuple_page->end(); ++it) {
+	for (it = tuple_page->begin(); it != tuple_page->end(); ++it) {
 	    tuple_t current_tuple = *it;
-	    output_t output_ret = output(current_tuple);
+	    stage_t::adaptor_t::output_t output_ret = adaptor->output(current_tuple);
 	    switch (output_ret) {
-	    case OUTPUT_RETURN_CONTINUE:
+	    case stage_t::adaptor_t::OUTPUT_RETURN_CONTINUE:
 		continue;
-	    case OUTPUT_RETURN_STOP:
+	    case stage_t::adaptor_t::OUTPUT_RETURN_STOP:
 		return 0;
-	    case OUTPUT_RETURN_ERROR:
+	    case stage_t::adaptor_t::OUTPUT_RETURN_ERROR:
 		return -1;
 	    default:
-		TRACE(TRACE_ALWAYS, "output() return unrecognized value %d\n",
+		TRACE(TRACE_ALWAYS, "adaptor->output() return unrecognized value %d\n",
 		      output_ret);
 		QPIPE_PANIC();
 	    }
@@ -119,21 +112,4 @@ int fscan_stage_t::process() {
 
 	// continue to next page
     }
-
-    // control never reaches here
-    return -1;
-}
-
-
-
-void fscan_stage_t::terminate_stage() {
-
-    if ( fclose(_file) ) {
-	// We have already sent data, so no need to abort the queries.
-	// We should log, but ignore fclose() errors
-	TRACE(TRACE_ALWAYS, "Error closing %s input file %s\n", _stage_name, _filename);
-    }
-	      
-    free(_filename);    
-    free(_tuple_page);
 }

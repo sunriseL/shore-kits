@@ -6,9 +6,7 @@ INCLUDES = -I$(top_srcdir)/include
 LDADD = ../src/libqpipe.a
 
 # define programs here
-bin_PROGRAMS = 
-
-#\
+bin_PROGRAMS = \
    test_trace \
    test_fdump_stage \
    test_fscan_stage

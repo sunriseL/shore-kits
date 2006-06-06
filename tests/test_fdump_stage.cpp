@@ -38,7 +38,6 @@ void* write_tuples(void* arg)
     tuple_buffer_t* int_buffer = (tuple_buffer_t*)arg;
 
     int_buffer->wait_init();
-
     
     for (int i = 0; i < num_fdump_tuples; i++) {
 	tuple_t in_tuple((char*)&i, sizeof(int));
@@ -63,7 +62,7 @@ int main(int argc, char* argv[]) {
     
     // parse output filename
     if ( argc < 3 ) {
-	TRACE(TRACE_ALWAYS, "Usage: %s <input file> <tuple count>\n", argv[0]);
+	TRACE(TRACE_ALWAYS, "Usage: %s <output file> <tuple count>\n", argv[0]);
 	exit(-1);
     }
     const char* input_filename = argv[1];
@@ -87,6 +86,9 @@ int main(int argc, char* argv[]) {
     
     // just need to pass one int at a time to the counter
     tuple_buffer_t int_buffer(sizeof(int));
+    tuple_buffer_t signal_buffer(sizeof(int));
+
+
     tester_thread_t* writer_thread =
 	new tester_thread_t(write_tuples, &int_buffer, "WRITER_THREAD");
     
@@ -95,12 +97,10 @@ int main(int argc, char* argv[]) {
 	QPIPE_PANIC();
     }
     
-
     // aggregate single count result (single int)
-    tuple_buffer_t  signal_buffer(sizeof(int));
     fdump_packet_t* packet = 
-	new fdump_packet_t("FDUMP_PACKET", &signal_buffer, &int_buffer, "ints.bin");
-
+	new fdump_packet_t("FDUMP_PACKET", &signal_buffer, &int_buffer, &signal_buffer, input_filename);
+    
     
     sc->enqueue(packet);
   

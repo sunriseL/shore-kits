@@ -5,12 +5,13 @@ INCLUDES = -I$(top_srcdir)/include
 
 
 
-STAGES = 
+STAGES = \
+   stages/fdump.cpp \
+   stages/fscan.cpp
 
 #\
-   stages/sort.cpp \
-   stages/fscan.cpp \
-   stages/fdump.cpp
+   stages/sort.cpp
+
 
 #\
    stages/scalar_aggregate.cpp \

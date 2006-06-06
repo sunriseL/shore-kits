@@ -336,7 +336,8 @@ void stage_container_t::stage_adaptor_t::terminate_packet(packet_t* packet, int 
 void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
 
     assert( stage != NULL );
-    int process_ret = stage->process_packet(this);
+    stage->init(this);
+    int process_ret = stage->process();
     stop_accepting_packets();
 
 
@@ -373,8 +374,11 @@ void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
 	packet->_stage_next_tuple_on_merge = 0; // reinitialize
     }
 
-    // re-enqueue incomplete packets
-    _container->container_queue_enqueue_no_merge(_packet_list);
+    // re-enqueue incomplete packets if we have them
+    if ( _packet_list->empty() )
+	delete _packet_list;
+    else
+	_container->container_queue_enqueue_no_merge(_packet_list);
 }
 
 

@@ -31,7 +31,7 @@ struct fdump_packet_t : public packet_t {
 
     tuple_buffer_t* _input_buffer;
     
-    char*    _filename;
+    char* _filename;
 
 
     /**
@@ -54,8 +54,10 @@ struct fdump_packet_t : public packet_t {
     fdump_packet_t(char* packet_id,
 		   tuple_buffer_t* output_buffer,
 		   tuple_buffer_t* input_buffer,
+		   tuple_buffer_t* client_buffer,
 		   const char*     filename)
-	: packet_t(packet_id, PACKET_TYPE, output_buffer, new tuple_filter_t()),
+	: packet_t(packet_id, PACKET_TYPE, output_buffer,
+		   new tuple_filter_t(), client_buffer),
 	  _input_buffer(input_buffer)
     {
 	if ( asprintf(&_filename, "%s", filename) == -1 ) {
@@ -96,27 +98,17 @@ struct fdump_packet_t : public packet_t {
  */
 class fdump_stage_t : public stage_t {
 
-protected:
-
-    tuple_buffer_t* _input_buffer;
-
-    char* _filename;
-
-    FILE* _file;
-
 public:
 
     static const char* DEFAULT_STAGE_NAME;
 
-    fdump_stage_t(packet_list_t* stage_packets,
-		  stage_container_t* stage_container,
-		  const char* stage_name);
-    
-    virtual ~fdump_stage_t();
+    fdump_stage_t() { }
+
+    virtual ~fdump_stage_t() { }
     
 protected:
-    virtual int  process();
-    virtual void terminate_stage();
+
+    virtual int process_packet();
 };
 
 

@@ -44,22 +44,40 @@ public:
     };
 
 
+protected:
+
+    adaptor_t* _adaptor;
+
+    virtual int process_packet()=0;
+
 public:
 
-    stage_t() { }
+    stage_t()
+	: _adaptor(NULL)
+    {
+    }
+
     virtual ~stage_t() { }
     
-    
+
+    void init(adaptor_t* adaptor) {
+	_adaptor = adaptor;
+    }    
+
+
     /**
-     *  @brief Process this packet. Use output() to output tuples
-     *  produced.
+     *  @brief Process this packet. The stage container must invoke
+     *  init_stage() with an adaptor that we can use.
      *
      *  @return 0 on success. Non-zero value on unrecoverable
      *  error. If this function returns error, the stage will
      *  terminate all queries that it is currently involved in
      *  computing.
      */
-    virtual int process_packet(adaptor_t* adaptor)=0;
+    int process() {
+	assert(_adaptor != NULL);
+	return process_packet();
+    }
 };
 
 
