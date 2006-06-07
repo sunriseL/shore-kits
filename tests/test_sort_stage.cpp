@@ -36,7 +36,7 @@ void* write_tuples(void* arg)
     tuple_buffer_t *buffer = (tuple_buffer_t *)arg;
 
     // produce a set of inputs, with duplicated values
-    static const int values = 200;
+    static const int values = 2500;
     static const int copies = 5;
     vector<int> inputs;
     for(int i=0; i < values; i++)
@@ -59,10 +59,10 @@ void* write_tuples(void* arg)
                 TRACE(TRACE_ALWAYS, "Terminating loop...\n");
                 break;
             }
-        else
-            TRACE(TRACE_ALWAYS, "Inserted tuple %d\n", value);
+        //        else
+        //            TRACE(TRACE_ALWAYS, "Inserted tuple %d\n", value);
     }
-
+    TRACE(TRACE_ALWAYS, "Finished inserting tuples\n", value);
     buffer->send_eof();
     return NULL;
 }

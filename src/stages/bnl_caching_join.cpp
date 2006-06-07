@@ -67,7 +67,7 @@ int bnl_caching_join_stage_t::create_cache_file(string &name, bnl_caching_join_p
               name_template);
         return -1;
     }
-    if ( fclose(fd) ) {
+    if ( close(fd) ) {
 	TRACE(TRACE_ALWAYS, "fclose() failed on temp file %s\n",
 	      name_template);
 	return -1;

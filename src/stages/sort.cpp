@@ -76,6 +76,7 @@ static void flush_page(tuple_page_t *page, FILE *file,
               file_name.data());
         QPIPE_PANIC();
     }
+    page->clear();
 }
 
 
@@ -92,6 +93,9 @@ void sort_stage_t::check_finished_merges() {
         if(it->_buffer->eof()) {
             // move it to the finished run list
             _finished_merges[it->_merge_level].push_back(it->_file_name);
+
+            // delete the merge record and any input files it used
+            remove_input_files(it->_buffer);
             it = _current_merges.erase(it);
         }
         else {
@@ -105,6 +109,9 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                                int merge_factor) {
     int level = entry->first;
     name_list_t &names = entry->second;
+
+    // stores the files associated with this merge run
+    name_list_t input_files;
     
     // create an fscan packet for each input run
     buffer_list_t fscan_buffers;
@@ -123,14 +130,16 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
         // store the output buffer
         fscan_buffers.push_back(buf);
 
+        // add the file to the merge input list
+        input_files.push_back(it->data());
+
         // remove this element from the list
         it = names.erase(it);
     }
     
     // create a merge packet to consume the fscans
     merge_packet_t *mp;
-    tuple_buffer_t *merge_out;
-    merge_out = new tuple_buffer_t(_tuple_size);
+    tuple_buffer_t *merge_out = new tuple_buffer_t(_tuple_size);
     mp = new merge_packet_t("Sort-merge",
                             merge_out,
                             _adaptor->get_packet()->client_buffer,
@@ -145,6 +154,7 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
     // last merge run? Send it to the output buffer instead of fdump
     if(_sorting_finished && _current_merges.empty() && _finished_merges.size() == 1) {
         _current_merges.push_back(run_info_t(level+1, "", merge_out));
+        _merge_inputs[merge_out] = input_files;
         return;
     }
                 
@@ -157,12 +167,13 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
     fdump_out = new tuple_buffer_t(_tuple_size);
     fp = new fdump_packet_t("merge-fdump",
                             fdump_out,
-                            _adaptor->get_packet()->client_buffer,
                             merge_out,
+                            _adaptor->get_packet()->client_buffer,
                             file_name.data(),
                             &_monitor);
     dispatcher_t::dispatch_packet(fp);
     _current_merges.push_back(run_info_t(level+1, file_name, fdump_out));
+    _merge_inputs[fdump_out] = input_files;
 }
 
 /**
@@ -181,7 +192,7 @@ void sort_stage_t::start_new_merges() {
         // special case -- after sorting finishes always merge the
         // lowest level with no in-progress runs to ensure forward
         // progress
-        if(_sorting_finished) {
+        if(names.size() && _sorting_finished) {
             // try to find in-progress runs for this level (or
             // below). NOTE: since the list is sorted, lowest runs
             // first, the we only need to check the first entry
@@ -236,7 +247,13 @@ int sort_stage_t::process_packet() {
     _input = packet->input_buffer;
     _comparator = packet->compare;
     _tuple_size = _input->tuple_size;
+    _sorting_finished = false;
 
+    // do we even have any inputs?
+    _input->init_buffer();
+    if(_input->wait_for_input())
+        return 0;
+    
     // create a buffer page for writing to file
     page_guard_t out_page = tuple_page_t::alloc(_tuple_size, malloc);
     
@@ -255,15 +272,14 @@ int sort_stage_t::process_packet() {
     monitor = member_func_thread(this,
                                  &sort_stage_t::monitor_merge_packets,
                                  "merge monitor");
-
+    
     if(thread_create(&_monitor_thread, monitor)) {
         TRACE(TRACE_ALWAYS, "Unable to create the merge monitor thread");
         QPIPE_PANIC();
     }
 
     // create sorted runs
-    _input->init_buffer();
-    while(!_input->wait_for_input()) {
+    do {
         // TODO: check for early termination at regular intervals
         
         page_list_guard_t page_list;
@@ -306,20 +322,18 @@ int sort_stage_t::process_packet() {
         // make sure to pick up the stragglers
         if(!out_page->empty())
             flush_page(out_page, file, file_name);
-    
+
+        // are we done?
+        bool eof = _input->wait_for_input();
+        
         // notify the merge monitor thread that another run is ready
         critical_section_t cs(&_monitor._lock);
         _finished_merges[0].push_back(file_name);
+        _sorting_finished = eof;
         _monitor.notify_holding_lock();
-    }
+    } while(!_sorting_finished);
     
     // TODO: skip fdump/merge completely if there is only one run
-
-    // notify the monitor that sorting is complete
-    critical_section_t cs(&_monitor._lock);
-    _sorting_finished = true;
-    _monitor.notify_holding_lock();
-    cs.exit();
 
     // wait for the output buffer from the final merge to arrive
     tuple_buffer_t *merge_output;
@@ -339,3 +353,38 @@ int sort_stage_t::process_packet() {
     return 0;
 }
 
+sort_stage_t::~sort_stage_t()  {
+    // make sure the monitor thread exits before we do...
+    if(_monitor_thread && pthread_join(_monitor_thread, NULL)) {
+        TRACE(TRACE_ALWAYS, "sort stage unable to join on monitor thread");
+        QPIPE_PANIC();
+    }
+
+    // also, remove any remaining temp files
+    file_map_t::iterator it=_merge_inputs.begin();
+    while(it != _merge_inputs.end()) {
+        tuple_buffer_t *buf = it->first;
+        // increment now because remove_input_files() would
+        // invalidate the iterator
+        ++it;
+        remove_input_files(buf);
+    }
+}
+
+void sort_stage_t::remove_input_files(tuple_buffer_t *buf) {
+    // find the input files that fed this buffer
+    file_map_t::iterator names = _merge_inputs.find(buf);
+    if(names == _merge_inputs.end())
+        return;
+
+    // delete the files from disk. The delete will occur as soon as
+    // all current file handles are closed
+    name_list_t &files = names->second;
+    for(name_list_t::iterator it=files.begin(); it != files.end(); ++it) {
+        if(remove(it->data()))
+            TRACE(TRACE_ALWAYS, "Unable to remove file '%s'", it->data());
+    }
+
+    // delete the entry
+    _merge_inputs.erase(names);
+}

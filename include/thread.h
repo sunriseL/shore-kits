@@ -142,9 +142,11 @@ struct critical_section_t {
         : _mutex(mutex)
     {
         pthread_mutex_lock_wrapper(_mutex);
+        //        printf("Locked mutex %p\n", _mutex);
     }
     void exit() {
         if(_mutex) {
+            //            printf("Unlocked mutex %p\n", _mutex);
             pthread_mutex_unlock_wrapper(_mutex);
             _mutex = NULL;
         }

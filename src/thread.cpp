@@ -178,7 +178,7 @@ void pthread_mutex_init_wrapper(pthread_mutex_t* mutex, const pthread_mutexattr_
   int err;
 
   
-  if (attr == NULL && 0)
+  if (attr == NULL)
   {
     err = pthread_mutexattr_init(&mutex_attr);
     if (err)

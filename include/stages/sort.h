@@ -84,6 +84,7 @@ private:
 
     typedef std::deque<std::string> name_list_t;
     typedef std::map<int, name_list_t> run_map_t;
+    typedef std::map<tuple_buffer_t*, name_list_t> file_map_t;
     typedef std::list<run_info_t> run_list_t;
     typedef merge_packet_t::buffer_list_t buffer_list_t;
     typedef std::vector<key_tuple_pair_t> key_vector_t;
@@ -96,22 +97,18 @@ private:
     // merge management
     run_map_t _finished_merges;
     run_list_t _current_merges;
+    file_map_t _merge_inputs;
 
 public:
     static const char *DEFAULT_STAGE_NAME;
 
-    ~sort_stage_t() {
-        // make sure the monitor thread exits before we do...
-        if(_monitor_thread && pthread_join(_monitor_thread, NULL)) {
-            TRACE(TRACE_ALWAYS, "sort stage unable to join on monitor thread");
-            QPIPE_PANIC();
-        }
-    }
+    ~sort_stage_t();
     
 protected:
     virtual int process_packet();
 
 private:
+    void remove_input_files(tuple_buffer_t *buf);
     bool final_merge_ready();
     int create_sorted_run(int page_count);
 
