@@ -29,30 +29,21 @@ int fscan_stage_t::process_packet() {
 
 
     char* filename = packet->_filename;
-    FILE* file = fopen(filename, "r");
+    file_guard_t file = fopen(filename, "r");
     if ( file == NULL ) {
 	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n", filename);
 	return -1;
     }
     
 
-    tuple_page_t* tuple_page =
+    page_guard_t tuple_page =
 	tuple_page_t::alloc(packet->output_buffer->tuple_size, malloc);
     if ( tuple_page == NULL ) {
 	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
-	if ( fclose(file) )
-	    TRACE(TRACE_ALWAYS, "fclose() failed on %s\n", filename);
 	return -1;
     }
 
     int read_ret = read_file(adaptor, file, tuple_page);
-
-    free(tuple_page);
-    if ( fclose(file) ) {
-	TRACE(TRACE_ALWAYS, "fclose() failed on %s\n", filename);
-	return -1;
-    }
-
     return read_ret;
 }
 

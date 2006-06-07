@@ -352,11 +352,11 @@ public:
      *
      *  @param file The file to write to.
      *
-     *  @return The number of tuples written.
+     *  @return 0 if the page was successfully written, non-zero on error
      */
     
-    bool fwrite_full_page(FILE *file) {
-        return ::fwrite(this, 1, page_size(), file) == page_size();
+    int fwrite_full_page(FILE *file) {
+        return ::fwrite(this, 1, page_size(), file) != page_size();
     }
 
     

@@ -161,6 +161,7 @@ struct critical_section_t {
  */
 struct notify_t {
     volatile bool _notified;
+    volatile bool _cancelled;
     pthread_mutex_t _lock;
     pthread_cond_t _notify;
 
@@ -171,12 +172,63 @@ struct notify_t {
     }
 
     /**
+     * @brief Blocks the calling thread until either notify() or
+     * cancel() is called. If either method was called before wait()
+     * return immediately.
+     *
+     * @return zero if notified, non-zero if cancelled.
+     */
+    int wait() {
+        critical_section_t cs(&_lock);
+        return wait_holding_lock();
+    }
+
+    /**
+     * @brief Similar to wait(), except the caller is assumed to
+     * already hold the lock for other reasons.
+     */
+    int wait_holding_lock() {
+        while(!_notified && !_cancelled)
+            pthread_cond_wait_wrapper(&_notify, &_lock);
+
+        bool result = _cancelled;
+        _notified = _cancelled = false;
+        return result;
+    }
+    
+    /**
      * @brief Wake up a waiting thread. If no thread is waiting the
      * event will be remembered. 
      */
     void notify() {
         critical_section_t cs(&_lock);
-        _notified = true;
+        notify_holding_lock();
+    }
+
+    /**
+     * @brief Wake up a waiting thread from within an existing
+     * critical section.
+     *
+     * WARNING: the caller MUST hold (_lock) or the behavior of this
+     * function is undefined!
+     */
+    void notify_holding_lock() {
+        signal(_notified);
+    }
+
+    void cancel() {
+        critical_section_t cs(&_lock);
+        cancel_holding_lock();
+    }
+
+    void cancel_holding_lock() {
+        signal(_cancelled);
+    }
+    
+protected:
+
+    void signal(volatile bool &val) {
+        val = true;
         pthread_cond_signal_wrapper(&_notify);
     }
 };

@@ -31,7 +31,8 @@ int fdump_stage_t::process_packet() {
 
 
     char* filename = packet->_filename;
-    FILE* file = fopen(filename, "w+");
+    // make sure the file gets closed when we're done
+    file_guard_t file = fopen(filename, "w+");
     if (file == NULL) {
 	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n", filename);
 	return -1;
@@ -42,27 +43,13 @@ int fdump_stage_t::process_packet() {
     input_buffer->init_buffer();
 
     
-    // read the file
-    tuple_page_t* tuple_page;
+    // read the file; make sure the buffer pages get deleted
+    page_guard_t tuple_page;
     while ( (tuple_page = input_buffer->get_page()) != NULL ) {
-	if ( !tuple_page->fwrite_full_page(file) ) {
+	if (tuple_page->fwrite_full_page(file) ) {
 	    TRACE(TRACE_ALWAYS, "fwrite_full_page() failed\n");
-	    free(tuple_page);
-	    if ( fclose(file) )
-		TRACE(TRACE_ALWAYS, "fclose() failed on %s\n", filename);
 	    return -1;
 	}
-
-	// When we invoked get_page(), we took ownership of the page
-	// from the buffer. It is our responsibility to free it when
-	// we're done with it.
-	free(tuple_page);
-    }
-
-
-    if ( fclose(file) ) {
-	TRACE(TRACE_ALWAYS, "fclose() failed on %s\n", filename);
-	return -1;
     }
 
 

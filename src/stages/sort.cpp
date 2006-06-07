@@ -69,7 +69,7 @@ static FILE *create_tmp_file(string &name) {
  */
 static void flush_page(tuple_page_t *page, FILE *file,
                        const string &file_name) {
-    if(page->fwrite(file) != page->tuple_count()) {
+    if(page->fwrite_full_page(file)) {
         TRACE(TRACE_ALWAYS, "Error writing sorted run to file\n",
               file_name.data());
         QPIPE_PANIC();
@@ -180,16 +180,14 @@ void sort_stage_t::start_new_merges() {
         // lowest level with no in-progress runs to ensure forward
         // progress
         if(_sorting_finished) {
-            // try to find in-progress runs for this level (or below)
+            // try to find in-progress runs for this level (or
+            // below). NOTE: since the list is sorted, lowest runs
+            // first, the we only need to check the first entry
             run_list_t::iterator run=_current_merges.begin();
-            for( ; run != _current_merges.end(); ++run) {
-                if(run->_merge_level <= level)
-                    break;
-            }
 
             // no in-progress runs?
-            if(run == _current_merges.end())
-                start_merge(it, _current_merges.size());
+            if(run == _current_merges.end() || run->_merge_level > level)
+                start_merge(it, names.size());
                     
         }
 
@@ -213,12 +211,7 @@ tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
     while(1) {
     
         // wait for a merge to finish
-        _monitor._notified = false;
-        while(!_monitor._notified && !_sorting_finished && !_early_termination)
-            pthread_cond_wait_wrapper(&_monitor._notify, &_monitor._lock);
-
-        // cancelled?
-        if(_early_termination)
+        if(_monitor.wait_holding_lock())
             return NULL;
 
         // find the finished merge run(s)
@@ -255,20 +248,13 @@ int sort_stage_t::process_packet() {
     key_vector_t array;
     array.reserve(tuple_count);
 
-    // track file names of finished runs, grouped by their level in
-    // the hierarchy. When there are enough we'll fire off new merges.
-    run_map_t finished_runs;
-
-    // also track a list of unfinished runs to keep an eye on
-    run_list_t current_runs;
-
     // use a monitor thread to control the hierarchical merge
     thread_t *monitor;
     monitor = member_func_thread(this,
                                  &sort_stage_t::monitor_merge_packets,
                                  "merge monitor");
 
-    if(0 && thread_create(&_monitor_thread, monitor)) {
+    if(thread_create(&_monitor_thread, monitor)) {
         TRACE(TRACE_ALWAYS, "Unable to create the merge monitor thread");
         QPIPE_PANIC();
     }
@@ -314,12 +300,15 @@ int sort_stage_t::process_packet() {
             if(out_page->full())
                 flush_page(out_page, file, file_name);
         }
+
+        // make sure to pick up the stragglers
+        if(!out_page->empty())
+            flush_page(out_page, file, file_name);
     
         // notify the merge monitor thread that another run is ready
         critical_section_t cs(&_monitor._lock);
-        finished_runs[0].push_back(file_name);
-        _merge_finished = true;
-        pthread_cond_signal_wrapper(&_monitor._notify);
+        _finished_merges[0].push_back(file_name);
+        _monitor.notify_holding_lock();
     }
     
     // TODO: skip fdump/merge completely if there is only one run
@@ -327,12 +316,13 @@ int sort_stage_t::process_packet() {
     // notify the monitor that sorting is complete
     critical_section_t cs(&_monitor._lock);
     _sorting_finished = true;
-    pthread_cond_signal_wrapper(&_monitor._notify);
+    _monitor.notify_holding_lock();
     cs.exit();
 
     // wait for the output buffer from the final merge to arrive
     tuple_buffer_t *merge_output;
     pthread_join_wrapper(_monitor_thread, merge_output);
+    _monitor_thread = NULL;
     if(merge_output == NULL) {
         TRACE(TRACE_ALWAYS, "Merge failed. Bailing out early.");
         return 1;

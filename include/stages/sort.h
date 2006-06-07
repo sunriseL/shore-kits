@@ -91,9 +91,7 @@ private:
     // used to communicate with the monitor thread
     pthread_t _monitor_thread;
     notify_t _monitor;
-    volatile bool _merge_finished;
     volatile bool _sorting_finished;
-    volatile bool _early_termination;
 
     // merge management
     run_map_t _finished_merges;

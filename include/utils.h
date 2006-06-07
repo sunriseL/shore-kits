@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cassert>
 #include "tuple.h"
+#include "trace/trace.h"
 
 /* exported datatypes */
 
@@ -100,7 +101,7 @@ public:
  */
 template <class T>
 struct pointer_guard_t : public pointer_guard_base_t<T, pointer_guard_t<T> > {
-    pointer_guard_t(T *ptr)
+    pointer_guard_t(T *ptr=NULL)
         : pointer_guard_base_t<T, pointer_guard_t<T> >(ptr)
     {
     }
@@ -115,6 +116,8 @@ struct pointer_guard_t : public pointer_guard_base_t<T, pointer_guard_t<T> > {
         assign(ref._ptr);
         return *this;
     }
+private:
+    pointer_guard_t &operator=(pointer_guard_t &);
 };
 
 /**
@@ -123,7 +126,7 @@ struct pointer_guard_t : public pointer_guard_base_t<T, pointer_guard_t<T> > {
  */
 template <class T>
 struct array_guard_t : public pointer_guard_base_t<T, array_guard_t<T> > {
-    array_guard_t(T *ptr)
+    array_guard_t(T *ptr=NULL)
         : pointer_guard_base_t<T, array_guard_t<T> >(ptr)
     {
     }
@@ -138,13 +141,15 @@ struct array_guard_t : public pointer_guard_base_t<T, array_guard_t<T> > {
         assign(ref._ptr);
         return *this;
     }
+private:
+    array_guard_t &operator=(array_guard_t &);
 };
 
 /**
  * @brief Ensures that a page allocated with malloc+placement-new gets freed
  */
 struct page_guard_t : public pointer_guard_base_t<tuple_page_t, page_guard_t> {
-    page_guard_t(tuple_page_t *ptr)
+    page_guard_t(tuple_page_t *ptr=NULL)
         : pointer_guard_base_t<tuple_page_t, page_guard_t>(ptr)
     {
     }
@@ -159,6 +164,8 @@ struct page_guard_t : public pointer_guard_base_t<tuple_page_t, page_guard_t> {
         assign(ref._ptr);
         return *this;
     }
+private:
+    page_guard_t &operator=(page_guard_t &);
 };
 
 /**
@@ -189,21 +196,26 @@ struct page_list_guard_t : public pointer_guard_base_t<page_t, page_list_guard_t
         assign(ref._ptr);
         return *this;
     }
+private:
+    page_list_guard_t &operator=(page_list_guard_t &);
 };
 
 /**
  * @brief Ensures that a file gets closed
  */
 struct file_guard_t : public pointer_guard_base_t<FILE, file_guard_t> {
-    file_guard_t(FILE *ptr)
+    file_guard_t(FILE *ptr=NULL)
         : pointer_guard_base_t<FILE, file_guard_t>(ptr)
     {
     }
     struct Action {
         void operator()(FILE *ptr) {
-            fclose(ptr);
+            if(fclose(ptr)) 
+                TRACE(TRACE_ALWAYS, "fclose failed");
         }
     };
+private:
+    file_guard_t &operator=(file_guard_t &);
 };
 
 /**
