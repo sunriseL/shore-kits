@@ -102,7 +102,7 @@ public:
 
     ~sort_stage_t() {
         // make sure the monitor thread exits before we do...
-        if(pthread_join(_monitor_thread, NULL)) {
+        if(_monitor_thread && pthread_join(_monitor_thread, NULL)) {
             TRACE(TRACE_ALWAYS, "sort stage unable to join on monitor thread");
             QPIPE_PANIC();
         }

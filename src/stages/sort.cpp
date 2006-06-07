@@ -322,7 +322,7 @@ int sort_stage_t::process_packet() {
     // wait for the output buffer from the final merge to arrive
     tuple_buffer_t *merge_output;
     pthread_join_wrapper(_monitor_thread, merge_output);
-    _monitor_thread = NULL;
+    _monitor_thread = 0;
     if(merge_output == NULL) {
         TRACE(TRACE_ALWAYS, "Merge failed. Bailing out early.");
         return 1;
