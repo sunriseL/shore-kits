@@ -30,7 +30,7 @@ struct tuple_less_t {
         cmp = c;
     }
     bool operator()(const key_tuple_pair_t &a, const key_tuple_pair_t &b) {
-        return cmp->compare(a, b);
+        return cmp->compare(a, b) < 0;
     }
 };
 
@@ -48,7 +48,7 @@ static FILE *create_tmp_file(string &name) {
     if(fd < 0) {
         TRACE(TRACE_ALWAYS, "Unable to open temporary file %s!\n",
               name_template);
-        return NULL;
+        QPIPE_PANIC();
     }
 
     // open a stream on the file
@@ -56,28 +56,12 @@ static FILE *create_tmp_file(string &name) {
     if(!file) {
         TRACE(TRACE_ALWAYS, "Unable to open a stream on %s\n",
               name_template);
-        return NULL;
+        QPIPE_PANIC();
     }
 
     name = string(name_template);
     return file;
 }
-
-/**
- * @brief stores information about an in-progress merge run
- */
-struct sort_stage_t::run_info_t {
-    int _merge_level;
-    string _file_name;
-    // this output buffer never sends data -- just watch for eof
-    tuple_buffer_t *_buffer;
-
-    run_info_t(int level, const string &name, tuple_buffer_t *buf)
-        : _merge_level(level), _file_name(name), _buffer(buf)
-    {
-    }
-};
-
 
 
 /**
@@ -173,7 +157,8 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                             fdump_out,
                             _adaptor->get_packet()->client_buffer,
                             merge_out,
-                            file_name.data());
+                            file_name.data(),
+                            &_monitor);
     dispatcher_t::dispatch_packet(fp);
     _current_merges.push_back(run_info_t(level+1, file_name, fdump_out));
 }
@@ -224,13 +209,13 @@ void sort_stage_t::start_new_merges() {
  */
 tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
     // always in a critical section, but usually blocked on cond_wait
-    critical_section_t cs(&_monitor_lock);
+    critical_section_t cs(&_monitor._lock);
     while(1) {
     
         // wait for a merge to finish
-        _merge_finished = false;
-        while(!_merge_finished && !_sorting_finished && !_early_termination)
-            pthread_cond_wait_wrapper(&_monitor_notify, &_monitor_lock);
+        _monitor._notified = false;
+        while(!_monitor._notified && !_sorting_finished && !_early_termination)
+            pthread_cond_wait_wrapper(&_monitor._notify, &_monitor._lock);
 
         // cancelled?
         if(_early_termination)
@@ -250,25 +235,25 @@ tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
 
 const size_t sort_stage_t::MERGE_FACTOR = 3;
 
-int sort_stage_t::process_packet(adaptor_t *a) {
-    _adaptor = a;
+int sort_stage_t::process_packet() {
     sort_packet_t *packet = (sort_packet_t *)_adaptor->get_packet();
 
-    tuple_buffer_t *input = packet->input_buffer;
-    tuple_comparator_t *compare = packet->compare;
+    _input = packet->input_buffer;
+    _comparator = packet->compare;
+    _tuple_size = _input->tuple_size;
 
     // create a buffer page for writing to file
-    page_guard_t out_page = tuple_page_t::alloc(input->tuple_size, malloc);
+    page_guard_t out_page = tuple_page_t::alloc(_tuple_size, malloc);
     
     // the number of pages per initial run
     int page_count = 3;
 
     // create a key array 
-    int capacity = tuple_page_t::capacity(input->tuple_size,
-                                          input->page_size());
+    int capacity = tuple_page_t::capacity(_input->page_size(),
+                                          _tuple_size);
     int tuple_count = page_count*capacity;
-    array_guard_t<key_tuple_pair_t>
-        array = new key_tuple_pair_t[tuple_count];
+    key_vector_t array;
+    array.reserve(tuple_count);
 
     // track file names of finished runs, grouped by their level in
     // the hierarchy. When there are enough we'll fire off new merges.
@@ -278,27 +263,26 @@ int sort_stage_t::process_packet(adaptor_t *a) {
     run_list_t current_runs;
 
     // use a monitor thread to control the hierarchical merge
-    pthread_t tid;
     thread_t *monitor;
     monitor = member_func_thread(this,
                                  &sort_stage_t::monitor_merge_packets,
                                  "merge monitor");
 
-    if(!thread_create(&tid, monitor)) {
+    if(0 && thread_create(&_monitor_thread, monitor)) {
         TRACE(TRACE_ALWAYS, "Unable to create the merge monitor thread");
         QPIPE_PANIC();
     }
 
     // create sorted runs
-    while(!input->wait_for_input()) {
+    _input->init_buffer();
+    while(!_input->wait_for_input()) {
         // TODO: check for early termination at regular intervals
         
         page_list_guard_t page_list;
-    
-        int index = 0;
+        array.clear();
         for(int i=0; i < page_count; i++) {
             // read in a run of pages
-            tuple_page_t *page = input->get_page();
+            tuple_page_t *page = _input->get_page();
             if(!page)
                 break;
 
@@ -307,22 +291,23 @@ int sort_stage_t::process_packet(adaptor_t *a) {
 
             // add the tuples to the key array
             for(tuple_page_t::iterator it=page->begin(); it != page->end(); ++it) {
-                int key = compare->make_key(*it);
-                array[index++] = key_tuple_pair_t(key, it->data);
+                int key = _comparator->make_key(*it);
+                array.push_back(key_tuple_pair_t(key, it->data));
             }
         }
 
         // sort the key array (gotta love the STL!)
-        std::sort(&array[0], &array[index], tuple_less_t(compare));
+        std::sort(array.begin(), array.end(), tuple_less_t(_comparator));
 
         // open a temp file to hold the run
         string file_name;
         file_guard_t file = create_tmp_file(file_name);
 
         // dump the run to file
-        for(int i=0; i < index; i++) {
+        //        for(int i=0; i < index; i++) {
+        for(key_vector_t::iterator it=array.begin(); it != array.end(); ++it) {
             // write the tuple
-            tuple_t out(array[index].data, _tuple_size);
+            tuple_t out(it->data, _tuple_size);
             out_page->append_init(out);
 
             // flush?
@@ -331,23 +316,23 @@ int sort_stage_t::process_packet(adaptor_t *a) {
         }
     
         // notify the merge monitor thread that another run is ready
-        critical_section_t cs(&_monitor_lock);
+        critical_section_t cs(&_monitor._lock);
         finished_runs[0].push_back(file_name);
         _merge_finished = true;
-        pthread_cond_signal_wrapper(&_monitor_notify);
+        pthread_cond_signal_wrapper(&_monitor._notify);
     }
     
     // TODO: skip fdump/merge completely if there is only one run
 
     // notify the monitor that sorting is complete
-    critical_section_t cs(&_monitor_lock);
+    critical_section_t cs(&_monitor._lock);
     _sorting_finished = true;
-    pthread_cond_signal_wrapper(&_monitor_notify);
+    pthread_cond_signal_wrapper(&_monitor._notify);
     cs.exit();
 
     // wait for the output buffer from the final merge to arrive
     tuple_buffer_t *merge_output;
-    pthread_join_wrapper(tid, merge_output);
+    pthread_join_wrapper(_monitor_thread, merge_output);
     if(merge_output == NULL) {
         TRACE(TRACE_ALWAYS, "Merge failed. Bailing out early.");
         return 1;

@@ -647,14 +647,15 @@ public:
      */
 
     tuple_page_t *get_page() {
-	
-	page_t* next_page = page_buffer.read();
-	if ( next_page == NULL )
-	    return NULL;
 
-	// cast the next page in the buffer to a page with a
-	// tuple_page_t header
-        return tuple_page_t::mount(next_page);
+        // make sure there's a valid page
+	if(wait_for_input())
+            return NULL;
+
+        // steal the page (invalidate the tuple iterator)
+        tuple_page_t *result = read_page;
+        read_page = NULL;
+        return result;
     }
 
 

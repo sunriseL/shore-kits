@@ -9,6 +9,7 @@ LDADD = ../src/libqpipe.a
 bin_PROGRAMS = \
    test_trace \
    test_merge_stage \
+   test_sort_stage \
    test_fdump_stage \
    test_fscan_stage
 

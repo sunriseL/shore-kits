@@ -160,28 +160,14 @@ struct critical_section_t {
  * will be treated as one event.
  */
 struct notify_t {
-    volatile bool _waiting;
+    volatile bool _notified;
     pthread_mutex_t _lock;
     pthread_cond_t _notify;
 
     notify_t() {
-        _waiting = true;
+        _notified = false;
         pthread_mutex_init_wrapper(&_lock, NULL);
         pthread_cond_init_wrapper(&_notify, NULL);
-    }
-
-    /**
-     * @brief Blocks the calling thread until notify() is called. If
-     * notify() was already called return immediately.
-     */
-    void wait() {
-        critical_section_t cs(&_lock);
-        // wait for notification to arrive
-        while(_waiting)
-            pthread_cond_wait_wrapper(&_notify, &_lock);
-        
-        // reset for next time
-        _waiting = true;
     }
 
     /**
@@ -190,7 +176,7 @@ struct notify_t {
      */
     void notify() {
         critical_section_t cs(&_lock);
-        _waiting = false;
+        _notified = true;
         pthread_cond_signal_wrapper(&_notify);
     }
 };

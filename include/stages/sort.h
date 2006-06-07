@@ -16,7 +16,7 @@
 
 using namespace qpipe;
 
-
+using std::string;
 
 /* exported constants */
 
@@ -62,23 +62,35 @@ private:
     static const size_t MERGE_FACTOR;
     
     // state provided by the packet
-    adaptor_t *_adaptor;
-    tuple_buffer_t *_input_buffer;
+    tuple_buffer_t *_input;
     tuple_comparator_t *_comparator;
     size_t _tuple_size;
 
     
-    struct run_info_t;
+    /**
+     * @brief stores information about an in-progress merge run
+     */
+    struct run_info_t {
+        int _merge_level;
+        string _file_name;
+        // this output buffer never sends data -- just watch for eof
+        tuple_buffer_t *_buffer;
+
+        run_info_t(int level, const string &name, tuple_buffer_t *buf)
+            : _merge_level(level), _file_name(name), _buffer(buf)
+        {
+        }
+    };
 
     typedef std::deque<std::string> name_list_t;
     typedef std::map<int, name_list_t> run_map_t;
     typedef std::list<run_info_t> run_list_t;
     typedef merge_packet_t::buffer_list_t buffer_list_t;
+    typedef std::vector<key_tuple_pair_t> key_vector_t;
 
     // used to communicate with the monitor thread
     pthread_t _monitor_thread;
-    pthread_mutex_t _monitor_lock;
-    pthread_cond_t _monitor_notify;
+    notify_t _monitor;
     volatile bool _merge_finished;
     volatile bool _sorting_finished;
     volatile bool _early_termination;
@@ -99,7 +111,7 @@ public:
     }
     
 protected:
-    virtual int process_packet(adaptor_t *adaptor);
+    virtual int process_packet();
 
 private:
     bool final_merge_ready();
