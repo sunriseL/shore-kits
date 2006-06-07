@@ -9,7 +9,8 @@ STAGES = \
    stages/sort.cpp \
    stages/merge.cpp \
    stages/fdump.cpp \
-   stages/fscan.cpp
+   stages/fscan.cpp \
+   stages/bnl_caching_join.cpp
 
 #\
    stages/scalar_aggregate.cpp \

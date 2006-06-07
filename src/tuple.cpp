@@ -107,7 +107,6 @@ void tuple_buffer_t::send_eof() {
         page_buffer.write(write_page);
         write_page = NULL;
     }
-
     page_buffer.stop_writing();
 }
 
@@ -120,7 +119,6 @@ void tuple_buffer_t::send_eof() {
  */
 
 void tuple_buffer_t::close() {
-    free(read_page);
     page_buffer.stop_reading();
 }
 

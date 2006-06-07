@@ -15,7 +15,7 @@
 
 /* internal constants */
 
-#define MAX_STRERROR_STRING_SIZE 128
+#define MAX_STRERROR_STRING_SIZE 256
 
 
 
@@ -309,10 +309,12 @@ void* start_thread(void* thread_object)
 static void thread_error(const char* function_name, int err)
 {
   char error_buf[MAX_STRERROR_STRING_SIZE];
-  strerror_r(err, error_buf, MAX_STRERROR_STRING_SIZE);
-  TRACE(TRACE_ALWAYS, "%s failed: %s\n",
-	function_name,
-	error_buf);
+  if ( strerror_r(err, error_buf, MAX_STRERROR_STRING_SIZE) ) {
+      TRACE(TRACE_ALWAYS, "%s failed\n", function_name);
+      TRACE(TRACE_ALWAYS, "strerror_r() failed to parse error code\n");
+  }
+  else
+      TRACE(TRACE_ALWAYS, "%s failed: %s\n", function_name, error_buf);
 }
 
 
