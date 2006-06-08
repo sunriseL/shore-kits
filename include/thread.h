@@ -168,7 +168,7 @@ struct notify_t {
     pthread_cond_t _notify;
 
     notify_t() {
-        _notified = false;
+        _notified = _cancelled = false;
         pthread_mutex_init_wrapper(&_lock, NULL);
         pthread_cond_init_wrapper(&_notify, NULL);
     }

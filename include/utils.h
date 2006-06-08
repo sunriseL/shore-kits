@@ -5,14 +5,8 @@
 
 #include <cstdio>
 #include <cassert>
-#include "tuple.h"
 #include "trace/trace.h"
 
-/* exported datatypes */
-
-using qpipe::tuple_buffer_t;
-using qpipe::page_t;
-using qpipe::tuple_page_t;
 
 /**
  * @brief A generic pointer guard base class. An action will be
@@ -146,61 +140,6 @@ private:
 };
 
 /**
- * @brief Ensures that a page allocated with malloc+placement-new gets freed
- */
-struct page_guard_t : public pointer_guard_base_t<tuple_page_t, page_guard_t> {
-    page_guard_t(tuple_page_t *ptr=NULL)
-        : pointer_guard_base_t<tuple_page_t, page_guard_t>(ptr)
-    {
-    }
-    
-    struct Action {
-        void operator()(tuple_page_t *ptr) {
-            free(ptr);
-        }
-    };
-
-    page_guard_t &operator=(const page_guard_t::temp_ref_t &ref) {
-        assign(ref._ptr);
-        return *this;
-    }
-private:
-    page_guard_t &operator=(page_guard_t &);
-};
-
-/**
- * @brief Ensures that a list of pages allocated with malloc+placement-new is freed 
- */
-struct page_list_guard_t : public pointer_guard_base_t<page_t, page_list_guard_t> {
-    page_list_guard_t(page_t *ptr=NULL)
-        : pointer_guard_base_t<page_t, page_list_guard_t>(ptr)
-    {
-    }
-    struct Action {
-        void operator()(page_t *ptr) {
-            while(ptr) {
-                page_t *page = ptr;
-                ptr = page->next;
-                free(page);
-            }
-        }
-    };
-    
-    void append(page_t *ptr) {
-        assert(ptr);
-        ptr->next = release();
-        assign(ptr);
-    }
-
-    page_list_guard_t &operator=(const page_list_guard_t::temp_ref_t &ref) {
-        assign(ref._ptr);
-        return *this;
-    }
-private:
-    page_list_guard_t &operator=(page_list_guard_t &);
-};
-
-/**
  * @brief Ensures that a file gets closed
  */
 struct file_guard_t : public pointer_guard_base_t<FILE, file_guard_t> {
@@ -216,44 +155,6 @@ struct file_guard_t : public pointer_guard_base_t<FILE, file_guard_t> {
     };
 private:
     file_guard_t &operator=(file_guard_t &);
-};
-
-/**
- *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
- *  that the buffer is initialized, then close it when this wrapper
- *  goes out of scope. By using this wrapper, we can avoid duplicating
- *  close() code at every exit point.
- */
-struct buffer_guard_t {
-    tuple_buffer_t *buffer;
-    buffer_guard_t(tuple_buffer_t *buf=NULL) {
-        *this = buf;
-    }
-  
-    ~buffer_guard_t() {
-        if(buffer)
-            buffer->close();
-    }
-
-    buffer_guard_t &operator=(tuple_buffer_t *buf) {
-        buffer = buf;
-        if(buffer)
-            buffer->init_buffer();
-        
-        return *this;
-    }
-
-    tuple_buffer_t *operator->() {
-        return buffer;
-    }
-
-    operator tuple_buffer_t*() {
-        return buffer;
-    }
-private:
-    // no copying
-    buffer_guard_t &operator=(const buffer_guard_t &other);
-    buffer_guard_t(const buffer_guard_t &other);
 };
 
 #endif

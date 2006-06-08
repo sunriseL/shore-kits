@@ -42,6 +42,7 @@ void* write_tuples(void* arg)
     // produce a set of inputs, with duplicated values
     static const int copies = 5;
     vector<int> inputs;
+    inputs.reserve(values*copies);
     for(int i=0; i < values; i++)
         for(int j=0; j < copies; j++)
             inputs.push_back(i);

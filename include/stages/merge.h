@@ -49,25 +49,35 @@ struct merge_packet_t : public packet_t {
 class merge_stage_t : public stage_t {
 private:
     struct buffer_head_t {
+        // for the linked list
+        buffer_head_t *next;
+        
         tuple_buffer_t *buffer;
         tuple_comparator_t *cmp;
+        array_guard_t<char> data;
+        tuple_t tuple;
         key_tuple_pair_t item;
-        buffer_head_t(tuple_buffer_t *buf, tuple_comparator_t *c);
-        bool has_next();
+        buffer_head_t() { }
+        bool init(tuple_buffer_t *buf, tuple_comparator_t *c);
+        bool has_tuple();
     };
-    typedef list<buffer_head_t> head_list_t;
-
-    head_list_t _buffers;
+    
+    buffer_head_t *_head_list;
     tuple_comparator_t *_comparator;
     
 public:
     static const char *DEFAULT_STAGE_NAME;
+
+    merge_stage_t()
+        : _head_list(NULL)
+    {
+    }
     
 protected:
     virtual int process_packet();
 
 private:
-    void insert_sorted(const buffer_head_t &head);
+    void insert_sorted(buffer_head_t *head);
 };
 
 

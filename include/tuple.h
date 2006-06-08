@@ -10,6 +10,7 @@
 #include <cstdio>
 
 #include "page.h"
+#include "utils.h"
 
 
 // for Dbt class
@@ -517,6 +518,30 @@ protected:
 };
 
 
+/**
+ * @brief Ensures that a page allocated with malloc+placement-new gets freed
+ */
+struct page_guard_t : public pointer_guard_base_t<tuple_page_t, page_guard_t> {
+    page_guard_t(tuple_page_t *ptr=NULL)
+        : pointer_guard_base_t<tuple_page_t, page_guard_t>(ptr)
+    {
+    }
+    
+    struct Action {
+        void operator()(tuple_page_t *ptr) {
+            free(ptr);
+        }
+    };
+
+    page_guard_t &operator=(const page_guard_t::temp_ref_t &ref) {
+        assign(ref._ptr);
+        return *this;
+    }
+private:
+    page_guard_t &operator=(page_guard_t &);
+};
+
+
 
 /**
  *  @brief Thread-safe tuple buffer. This class allows one thread to
@@ -541,9 +566,9 @@ private:
     int lastTransmit;
     int sample;
 
-    tuple_page_t *read_page;
+    page_guard_t read_page;
     tuple_page_t::iterator read_iterator;
-    tuple_page_t *write_page;
+    page_guard_t write_page;
 
     bool input_arrived;
 
@@ -653,9 +678,7 @@ public:
             return NULL;
 
         // steal the page (invalidate the tuple iterator)
-        tuple_page_t *result = read_page;
-        read_page = NULL;
-        return result;
+        return read_page.release();
     }
 
 
@@ -724,8 +747,55 @@ protected:
     int check_page_full();
 
     int init(size_t tuple_size, size_t num_pages);
+
+    int flush_write_page() {
+        int result = page_buffer.write(write_page);
+        if(result)
+            write_page = NULL;
+        else
+            write_page.release();
+        
+        return result;
+    }
 };
 
+/**
+ *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
+ *  that the buffer is initialized, then close it when this wrapper
+ *  goes out of scope. By using this wrapper, we can avoid duplicating
+ *  close() code at every exit point.
+ */
+struct buffer_guard_t {
+    tuple_buffer_t *buffer;
+    buffer_guard_t(tuple_buffer_t *buf=NULL) {
+        *this = buf;
+    }
+  
+    ~buffer_guard_t() {
+        if(buffer)
+            buffer->close();
+    }
+
+    buffer_guard_t &operator=(tuple_buffer_t *buf) {
+        buffer = buf;
+        if(buffer)
+            buffer->init_buffer();
+        
+        return *this;
+    }
+
+    tuple_buffer_t *operator->() {
+        return buffer;
+    }
+
+    operator tuple_buffer_t*() {
+        return buffer;
+    }
+private:
+    // no copying
+    buffer_guard_t &operator=(const buffer_guard_t &other);
+    buffer_guard_t(const buffer_guard_t &other);
+};
 
 
 #include "namespace.h"

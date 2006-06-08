@@ -41,23 +41,29 @@ void merge_packet_t::terminate_inputs() {
  * the heap by up to 2x and make it even less attractive than shown
  * above.
  */
-merge_stage_t::buffer_head_t::buffer_head_t(tuple_buffer_t *buf,
-                                            tuple_comparator_t *c) {
+bool merge_stage_t::buffer_head_t::init(tuple_buffer_t *buf,
+                                        tuple_comparator_t *c)
+{
     buffer = buf;
     cmp = c;
     buffer->init_buffer();
-        
+    int size = buffer->tuple_size;
+    data = new char[size];
+    tuple = tuple_t(data, size);
+    item.data = data;
+    return has_tuple();
 }
 
-
-bool merge_stage_t::buffer_head_t::has_next() {
-    tuple_t tuple;
-    if(!buffer->get_tuple(tuple))
+bool merge_stage_t::buffer_head_t::has_tuple() {
+    tuple_t input;
+    if(!buffer->get_tuple(input))
         return false;
 
-    // update the head
+    // copy the tuple to safe memory
+    tuple.assign(input);
+
+    // update the head key
     item.key = cmp->make_key(tuple);
-    item.data = tuple.data;
     return true;
 }
 
@@ -66,49 +72,66 @@ bool merge_stage_t::buffer_head_t::has_next() {
 /**
  * @brief Inserts an item into the list in ascending order
  */
-void merge_stage_t::insert_sorted(const buffer_head_t &head)
+void merge_stage_t::insert_sorted(buffer_head_t *head)
 {
-    // find the right position
-    head_list_t::iterator it=_buffers.begin();
-    while(it != _buffers.end() && _comparator->compare(it->item, head.item) < 0)
-        ++it;
+    // beginning? (if so we have to change the list base pointer)
+    if(!_head_list || _comparator->compare(head->item, _head_list->item) <= 0) {
+        head->next = _head_list;
+        _head_list = head;
+        return;
+    }
+
+    // find the position, then
+    buffer_head_t *prev = _head_list;
+    while(prev->next && _comparator->compare(prev->next->item, head->item) < 0)
+        prev = prev->next;
     
     // insert
-    _buffers.insert(it, head);
+    head->next = prev->next;
+    prev->next = head;
 }
 
 const char *merge_packet_t::PACKET_TYPE = "Merge";
 const char *merge_stage_t::DEFAULT_STAGE_NAME = "Merge";
 
+
 int merge_stage_t::process_packet() {
     merge_packet_t *packet = (merge_packet_t *)_adaptor->get_packet();
 
     typedef merge_packet_t::buffer_list_t buffer_list_t;
-    typedef buffer_list_t::iterator iterator;
 
     _comparator = packet->comparator;
-    size_t tuple_size = packet->output_buffer->tuple_size;
     buffer_list_t &inputs = packet->input_buffers;
     
+    // allocate an array of buffer heads
+    int merge_factor = inputs.size();
+    printf("merge factor = %d\n", merge_factor);
+    buffer_head_t head_array[merge_factor];
+                             
     // get the input buffers and perform the initial sort
-    for(iterator it=inputs.begin(); it != inputs.end(); ++it) {
-        buffer_head_t head(*it, _comparator);
-        if(head.has_next())
-            insert_sorted(head);
+    for(int i=0; i < merge_factor; i++) {
+        buffer_head_t &head = head_array[i];
+        if(head.init(inputs[i], _comparator))
+            insert_sorted(&head);
     }
 
     // always output the smallest tuple
-    tuple_t tuple(NULL, tuple_size);
-    while(_buffers.size()) {
-        buffer_head_t head = _buffers.front();
-        _buffers.pop_front();
-        tuple.data = head.item.data;
-        if(_adaptor->output(tuple))
+    for(int i=0; _head_list; i++) {
+        // pop it off
+        buffer_head_t *head = _head_list;
+        _head_list = head->next;
+
+        // output it
+        if(_adaptor->output(head->tuple))
             return 1;
 
         // put it back?
-        if(head.has_next())
+        if(i == 512877) 
+            printf("Uh-oh\n");
+        if(head->has_tuple())
             insert_sorted(head);
+        else
+            printf("Input exhausted\n");
     }
 
     // done!

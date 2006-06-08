@@ -5,6 +5,7 @@
 
 #include "thread.h"
 #include <new>
+#include "utils.h"
 
 
 
@@ -190,6 +191,38 @@ private:
         size += uncommitted_write_count;
         uncommitted_write_count = 0;
     }
+};
+
+/**
+ * @brief Ensures that a list of pages allocated with malloc+placement-new is freed 
+ */
+struct page_list_guard_t : public pointer_guard_base_t<page_t, page_list_guard_t> {
+    page_list_guard_t(page_t *ptr=NULL)
+        : pointer_guard_base_t<page_t, page_list_guard_t>(ptr)
+    {
+    }
+    struct Action {
+        void operator()(page_t *ptr) {
+            while(ptr) {
+                page_t *page = ptr;
+                ptr = page->next;
+                free(page);
+            }
+        }
+    };
+    
+    void append(page_t *ptr) {
+        assert(ptr);
+        ptr->next = release();
+        assign(ptr);
+    }
+
+    page_list_guard_t &operator=(const page_list_guard_t::temp_ref_t &ref) {
+        assign(ref._ptr);
+        return *this;
+    }
+private:
+    page_list_guard_t &operator=(page_list_guard_t &);
 };
 
 

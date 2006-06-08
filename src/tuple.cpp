@@ -22,16 +22,12 @@ int tuple_buffer_t::check_page_full() {
     // next page?
     if(write_page->full()) {
         // cancelled?
-        if(page_buffer.write(write_page))
+        if(flush_write_page())
             return 1;
         
         // TODO: something besides malloc
         write_page = tuple_page_t::alloc(tuple_size, malloc, _page_size);
-	if ( write_page == NULL ) {
-	    return 1;
-	}
-	
-        return 0;
+	return (write_page == NULL);
     }
 
     // otherwise just test for cancellation
@@ -51,7 +47,7 @@ int tuple_buffer_t::check_page_full() {
 
 int tuple_buffer_t::wait_for_input() {
  
-    if(read_page != NULL)
+    if(read_page != NULL && read_iterator != read_page->end())
 	return 0;
    
     // wait for the next page to arrive
@@ -83,13 +79,8 @@ bool tuple_buffer_t::get_tuple(tuple_t &rec) {
     // make sure there is a valid page
     if(wait_for_input())
         return false;
-
-    rec = *read_iterator++;
-    if(read_iterator == read_page->end()) {
-        free(read_page);
-        read_page = NULL;
-    }
     
+    rec = *read_iterator++;
     return true;
 }
 
@@ -103,10 +94,9 @@ bool tuple_buffer_t::get_tuple(tuple_t &rec) {
  */
 
 void tuple_buffer_t::send_eof() {
-    if(!write_page->empty()) {
-        page_buffer.write(write_page);
-        write_page = NULL;
-    }
+    if(!write_page->empty()) 
+        flush_write_page();
+
     page_buffer.stop_writing();
 }
 
@@ -163,14 +153,6 @@ tuple_buffer_t::~tuple_buffer_t() {
 
     pthread_mutex_destroy_wrapper(&init_lock);
     pthread_cond_destroy_wrapper(&init_notify);
-
-    // The page_buffer_t destructor will destroy its pages. We need to
-    // free the read and write page separately since they are outside
-    // the buffer.
-    if(read_page)
-        free(read_page);
-    if(write_page)
-	free(write_page);
 }
 
 

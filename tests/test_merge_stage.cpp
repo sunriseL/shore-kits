@@ -52,10 +52,11 @@ void* write_tuples(void* arg)
                 TRACE(TRACE_ALWAYS, "Terminating loop...\n");
                 break;
             }
-        else
-            TRACE(TRACE_ALWAYS, "Inserted tuple %d\n", value);
+        //        else
+        //            TRACE(TRACE_ALWAYS, "Inserted tuple %d\n", value);
     }
 
+    TRACE(TRACE_ALWAYS, "Done inserting tuples\n");
     buffer->send_eof();
     return NULL;
 }
@@ -83,7 +84,7 @@ int main() {
     }
 
     static const int merge_factor = 5;
-    static const int count = 20;
+    static const int count = 20000000;
     write_info_t merge_info[merge_factor];
     
     // generate a list of count unique tuples with merge_factor
@@ -135,8 +136,10 @@ int main() {
     
     tuple_t output;
     output_buffer.init_buffer();
-    while(output_buffer.get_tuple(output))
-        TRACE(TRACE_ALWAYS, "Value: %d\n", *(int*)output.data);
+    while(output_buffer.get_tuple(output)) {
+    //        TRACE(TRACE_ALWAYS, "Value: %d\n", *(int*)output.data);
+    }
+    TRACE(TRACE_ALWAYS, "Output complete\n");
 
     return 0;
 }
