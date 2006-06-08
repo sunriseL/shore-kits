@@ -24,8 +24,10 @@ using namespace qpipe;
 /**
  *  @brief
  */
-struct fscan_packet_t : public packet_t {
+class fscan_packet_t : public packet_t {
   
+public:
+
     static const char* PACKET_TYPE;
     
     char* _filename;

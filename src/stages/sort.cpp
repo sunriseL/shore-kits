@@ -62,10 +62,13 @@ void sort_stage_t::check_finished_merges() {
     while(it != _current_merges.end()) {
         // finished? 
         if(it->_buffer->eof()) {
+
             // move it to the finished run list
             _finished_merges[it->_merge_level].push_back(it->_file_name);
-	    
 	    TRACE(TRACE_DEBUG, "Merge output %s done\n", it->_file_name.c_str());
+	    TRACE(TRACE_DEBUG, "Added file %s to _finished_merges[%d]\n",
+		  it->_file_name.c_str(),
+		  it->_merge_level);
 
             // delete the merge record and any input files it used
             remove_input_files(it->_buffer);
@@ -92,6 +95,7 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
     buffer_list_t fscan_buffers;
     name_list_t::iterator it = names.begin();
     for(int i=0; i < merge_factor; i++) {
+
         fscan_packet_t *p;
         tuple_buffer_t *buf = new tuple_buffer_t(_tuple_size);
         p = new fscan_packet_t("sort-fscan", buf,
@@ -123,6 +127,8 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                             new tuple_filter_t(),
                             merge_factor,
                             _comparator);
+    TRACE(TRACE_DEBUG, "Created %d-way MERGE\n", merge_factor);
+	  
 
     // fire it off
     dispatcher_t::dispatch_packet(mp);
@@ -159,39 +165,70 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
  * new merge whenever there are MERGE_FACTOR finished runs.
  */
 void sort_stage_t::start_new_merges() {
+
+    
+    TRACE(TRACE_DEBUG, "_finished_merged has size %d\n",
+	  _finished_merges.size());
+    
+
     // start up as many new runs as possible
     run_map_t::iterator it = _finished_merges.begin();
     while(it != _finished_merges.end()) {
+
         int level = it->first;
+	TRACE(TRACE_ALWAYS, "Running on level %d\n", level);
+
         name_list_t &names = it->second;
-        while(names.size() >= MERGE_FACTOR)
+	while(names.size() >= MERGE_FACTOR)
+	    // "normal" k-way merges
             start_merge(it, MERGE_FACTOR);
 
-        // special case -- after sorting finishes don't wait for
-        // MERGE_FACTOR runs to arrive (they won't). 
+
+	TRACE(TRACE_DEBUG, "Started full k-way merges at level %d\n", level);
+	TRACE(TRACE_DEBUG, "%d files remaining at level %d\n",
+	      names.size(),
+	      level);
+        run_map_t::iterator tmp_it = it;
+	++tmp_it;
+	TRACE(TRACE_DEBUG, "%d files remaining at level %d\n",
+	      tmp_it->second.size(),
+	      tmp_it->first);
+	
+
+        // special case -- if sorting has finished, we can't
+        // necessarily wait for MERGE_FACTOR runs to arrive (they may
+        // never come)
         if(names.size() && _sorting_finished) {
+	    
+
             // try to find in-progress runs at or below this level
             unsigned n = 0;
-            run_list_t::iterator run=_current_merges.begin();
-            while(run != _current_merges.end() && run->_merge_level > level) {
+            run_list_t::iterator run;
+	    // NGM changed > to <=
+	    for (run =_current_merges.begin(); run != _current_merges.end() && run->_merge_level <= level; ++run)
+	    {
+		TRACE(TRACE_DEBUG, "Detected in-progress run %s at level %d\n",
+		      run->_file_name.c_str(),
+		      run->_merge_level);
                 if(run->_merge_level == level+1)
                     n++;
-                
-                ++run;
             }
-            
+
             // no in-progress runs?
             if(run == _current_merges.end()) {
                 // should we start a partial merge at this level or
                 // promote the stragglers? At this point there are n
-                // >= 0 (m >= 0) in-progress (finished) merges at the
-                // next level. Promote the current batch of stragglers
-                // if n+m+1 <= MERGE_FACTOR.
+                // >= 0 in-progress and (m >= 0) (finished) merges at
+                // the next level. Promote the current batch of
+                // stragglers if n+m+1 <= MERGE_FACTOR.
                 name_list_t &new_names = _finished_merges[level+1];
                 unsigned m = new_names.size();
-                if(n + m < MERGE_FACTOR) {
+                if((m != 0) && (n + m < MERGE_FACTOR)) {
                     // promote the stragglers up a level -- it won't cascade
                     new_names.insert(new_names.end(), names.begin(), names.end());
+		    TRACE(TRACE_DEBUG, "Moved %d runs up to level %d\n",
+			  names.size(),
+			  level+1);
                     names.clear();
                 }
                 else {
@@ -330,6 +367,9 @@ int sort_stage_t::process_packet() {
         _finished_merges[0].push_back(file_name);
         _sorting_finished = eof;
         _monitor.notify_holding_lock();
+
+	TRACE(TRACE_DEBUG, "Added file %s to _finished_merges[0]\n", file_name.c_str());
+
     } while(!_sorting_finished);
     
     // TODO: skip fdump/merge completely if there is only one run

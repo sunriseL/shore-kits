@@ -43,7 +43,7 @@ packet_t::packet_t(const char* _packet_id,
 	QPIPE_PANIC();
     }
 
-    TRACE(TRACE_PACKET_FLOW, "Created a new packet of type %s with ID %s\n",
+    TRACE(TRACE_PACKET_FLOW, "Created %s packet with ID %s\n",
 	  packet_type,
 	  packet_id);
 }
@@ -56,17 +56,18 @@ packet_t::packet_t(const char* _packet_id,
 
 packet_t::~packet_t(void) {
     
-  TRACE(TRACE_PACKET_FLOW, "Destroying packet of type %s with ID %s\n",
-	packet_type,
-	packet_id);
+    TRACE(TRACE_PACKET_FLOW, "Destroying %s packet with ID %s\n",
+	  packet_type,
+	  packet_id);
 
-  free(packet_id);
-  free(packet_type);
-  delete filter;
+    free(packet_id);
+    free(packet_type);
+    delete filter;
 
-  // the output_buffer is destroyed elsewhere since we must account
-  // for the possibility that someone is consuming from it
+    // the output_buffer is destroyed elsewhere since we must account
+    // for the possibility that someone is consuming from it
 }
+
 
 
 #ifdef DECLARED_IN_HEADER
@@ -82,6 +83,7 @@ void packet_t::abort_query() {
     // need to terminate _client_buffer
 }
 #endif
+
 
 
 #include "namespace.h"

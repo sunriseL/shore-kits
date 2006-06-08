@@ -16,8 +16,7 @@
 
 using namespace qpipe;
 
-using std::string;
-
+using namespace std;
 
 
 /* exported functions */
@@ -63,35 +62,39 @@ public:
 class sort_stage_t : public stage_t {
 
 private:
+
     static const size_t MERGE_FACTOR;
     
     // state provided by the packet
     tuple_buffer_t *_input;
     tuple_comparator_t *_comparator;
     size_t _tuple_size;
-
     
-    /**
-     * @brief stores information about an in-progress merge run
-     */
-    struct run_info_t {
-        int _merge_level;
-        string _file_name;
-        // this output buffer never sends data -- just watch for eof
-        tuple_buffer_t *_buffer;
 
-        run_info_t(int level, const string &name, tuple_buffer_t *buf)
-            : _merge_level(level), _file_name(name), _buffer(buf)
+    typedef deque<string> run_list_t;
+
+
+    // all information we need for an active merge
+    struct merge_t {
+	string _output; // name of output file
+	run_list_t _inputs;
+        tuple_buffer_t* _signal_buffer;
+        merge_t(const string &output, tuple_buffer_t *buf,
+		run_list_t::iterator begin, run_list_t::iterator end)
+            : _output(output),
+	      _inputs(begin, end),
+	      _signal_buffer(buf)
         {
         }
     };
 
-    typedef std::deque<std::string> name_list_t;
-    typedef std::map<int, name_list_t> run_map_t;
-    typedef std::map<tuple_buffer_t*, name_list_t> file_map_t;
-    typedef std::list<run_info_t> run_list_t;
+    
+    typedef map<int, run_list_t> run_map_t;
+    typedef vector<merge_t> merge_list_t;
+    typedef map<int, merge_list_t> merge_map_t;
     typedef merge_packet_t::buffer_list_t buffer_list_t;
-    typedef std::vector<key_tuple_pair_t> key_vector_t;
+    typedef vector<key_tuple_pair_t> key_vector_t;
+
 
     // used to communicate with the monitor thread
     pthread_t _monitor_thread;
@@ -99,9 +102,8 @@ private:
     volatile bool _sorting_finished;
 
     // merge management
-    run_map_t _finished_merges;
-    run_list_t _current_merges;
-    file_map_t _merge_inputs;
+    run_map_t _runs;
+    merge_map_t _merges;
 
 public:
 

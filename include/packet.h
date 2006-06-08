@@ -73,7 +73,6 @@ public:
 	initialized to 0. */
     unsigned int _stage_next_tuple_needed;
 
-public:
 
     packet_t::packet_t(const char* _packet_id,
 		       const char* _packet_type,
@@ -112,7 +111,6 @@ public:
     void disable_merging() {
 	merge_enabled = false;	
     }
-
 
 
     /**
