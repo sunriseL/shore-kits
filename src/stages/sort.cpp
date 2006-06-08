@@ -69,8 +69,7 @@ void sort_stage_t::check_finished_merges() {
 
                 // move it to the finished run list
                 _run_map[level].push_back(it->_output);
-                TRACE(TRACE_DEBUG, "Merge output %s done\n", it->_output.c_str());
-                TRACE(TRACE_DEBUG, "Added file %s to _finished_merges[%d]\n",
+                TRACE(TRACE_DEBUG, "Added finished merge file %s to _run_map[%d]\n",
                       it->_output.c_str(),
                       level);
 
@@ -95,41 +94,45 @@ void sort_stage_t::check_finished_merges() {
 
 void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor)
 {
-    
+
+    assert(merge_factor > 0);
+    assert(runs.size() >= (unsigned int)merge_factor);
+
+
     // allocate a new merge
     merge_list_t &merges = _merge_map[new_level];
     merges.resize(merges.size()+1);
     merge_t &merge = merges.back();
-    
-    // create an fscan packet for each input run
-    buffer_list_t fscan_buffers;
-    run_list_t::iterator it = runs.begin();
-    for(int i=0; i < merge_factor; i++) {
 
-        fscan_packet_t *p;
-        tuple_buffer_t *buf = new tuple_buffer_t(_tuple_size);
-        p = new fscan_packet_t("sort-fscan", buf,
+
+    run_list_t merge_inputs;
+    buffer_list_t fscan_buffers;
+
+
+    run_list_t::iterator it = runs.begin();
+    for(int i = 0; i < merge_factor; i++) {
+
+        // grab one of our runs
+	string run_filename = *it;
+        it = runs.erase(it);
+	
+        fscan_packet_t* p;
+        tuple_buffer_t* buf = new tuple_buffer_t(_tuple_size);
+        p = new fscan_packet_t("sort-fscan",
+			       buf,
                                new tuple_filter_t(),
                                _adaptor->get_packet()->client_buffer,
-                               it->data());
-	TRACE(TRACE_ALWAYS, "Created FSCAN on merge input %s\n", it->data());
-
-        // dispatch the packet
+                               run_filename.c_str());
         dispatcher_t::dispatch_packet(p);
 
-        // store the output buffer
-        fscan_buffers.push_back(buf);
-
-        // add the file to the merge input list
-        merge._inputs.push_back(it->data());
-
-        // remove this element from the list
-        it = runs.erase(it);
+	merge._inputs.push_back(run_filename.c_str());
+	fscan_buffers.push_back(buf);
     }
-    
+
+
     // create a merge packet to consume the fscans
-    merge_packet_t *mp;
-    tuple_buffer_t *merge_out = new tuple_buffer_t(_tuple_size);
+    merge_packet_t* mp;
+    tuple_buffer_t* merge_out = new tuple_buffer_t(_tuple_size);
     mp = new merge_packet_t("Sort-merge",
                             merge_out,
                             _adaptor->get_packet()->client_buffer,
@@ -137,21 +140,21 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
                             new tuple_filter_t(),
                             merge_factor,
                             _comparator);
-    TRACE(TRACE_DEBUG, "Created %d-way MERGE\n", merge_factor);
-	  
-
-    // fire it off
     dispatcher_t::dispatch_packet(mp);
 
-    // last merge run? Send it to the worker thread instead of fdump
+
+    // if this is the last merge run, send output to SORT worker
+    // thread, not to an FDUMP
     if(new_level < 0) {
         merge._signal_buffer = merge_out;
         return;
     }
-                
-    // create an fdump packet and store its output buffer
-    fdump_packet_t *fp;
-    tuple_buffer_t *fdump_out;
+    
+    
+    // otherwise, redirect merge to an FDUMP so we create a new run on
+    // disk
+    fdump_packet_t* fp;
+    tuple_buffer_t* fdump_out;
     string file_name;
     // KLUDGE! the fdump stage will reopen the file
     fclose(create_tmp_file(file_name));
@@ -163,6 +166,8 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
                             file_name.data(),
                             &_monitor);
     dispatcher_t::dispatch_packet(fp);
+
+
     merge._output = file_name;
     merge._signal_buffer = fdump_out;
 }
@@ -197,13 +202,19 @@ void sort_stage_t::start_new_merges() {
         }
 
         // increment the iterator. rename for clarity
-        run_map_t::iterator cur_level_it = level_it++;
+        run_map_t::iterator curr_level_it = level_it++;
         run_map_t::iterator next_level_it = level_it;
+
+	TRACE(TRACE_DEBUG, "curr_level = %d ; next_level = %d\n",
+	      curr_level_it->first,
+	      next_level_it->first);
         
-        // was that the last finished run at this level? erase it so
-        // the special case checks work right
+
+        // If we have no runs on this level, erase this level's
+        // _run_map entry. Now a level has no runs if no mapping
+        // exists, not if a mapping exists to a set of size 0.
         if(runs.empty()) {
-            _run_map.erase(cur_level_it);
+            _run_map.erase(curr_level_it);
             continue;
         }
         
@@ -213,19 +224,47 @@ void sort_stage_t::start_new_merges() {
         if(!_sorting_finished || started_merges)
             continue;
 
-        // try to find in-progress merges at or below this
-        // level. All runs below us should have been either merged
-        // or promoted in previous loop iterations
+
+	// Try to find (materialized) runs above this
+        // level. 'next_level_it' is set to -1 if no runs exist.
+        // Otherwise, it is set to the lowest level (above us) with
+        // such runs available.
+        int next_run_level =
+	    (next_level_it == _run_map.end()) ? -1 : next_level_it->first;
+
+	
+	// If these are the last runs in the system, issue one final
+	// merge request.
+	if ( _merge_map.empty() && (next_run_level < 0) ) {
+	    // No merges taking place below us and no runs above
+	    // us. Submit one final merge request. start_merge()
+	    // should redirect output to the SORT worker thread and
+	    // optimize for the single-merge case.
+	    start_merge(-1, runs, runs.size());
+	    _run_map.erase(curr_level_it);
+	    continue;
+	}
+
+
+        // Try to find in-progress merges at or below this
+        // level. 'lowest_merge_level' is set to -1 if no merges are
+        // found. Otherwise, it is set to the lowest level where a
+        // merge is taking place.
         merge_map_t::iterator merges = _merge_map.begin();
         int lowest_merge_level = (merges == _merge_map.end())? -1 : merges->first;
-        int next_run_level = (next_level_it == _run_map.end())? -1 : next_level_it->first;
 
-        // choose the lower of the two levels
+	TRACE(TRACE_DEBUG, "lowest_merge_level = %d ; next_run_level = %d\n",
+	      lowest_merge_level,
+	      next_run_level);
+
+	
+        // We reduce system I/O when we merge small files together
+        // before moving them up the merge hierarchy.
         int next_size;
         int next_level;
         if(lowest_merge_level > next_run_level) {
-            // only runs at the next level
-            next_size = next_level_it->second.size();
+            // no merges below and only runs at the next level
+            next_size  = next_level_it->second.size();
             next_level = next_run_level;
         }
         else if(lowest_merge_level < next_run_level) {
@@ -244,7 +283,13 @@ void sort_stage_t::start_new_merges() {
             next_level = lowest_merge_level;
         }
 
-        // activity below us? wait for it to finish first
+	TRACE(TRACE_DEBUG, "next_size = %d ; next_level = %d\n",
+	      next_size,
+	      next_level);
+
+        // If there are things happening below us, wait for them to
+        // finish. We really want to merge with every run/merge below
+        // before shipping work to higher levels of merge hierarchy
         if(next_level <= level)
             continue;
                 
@@ -263,7 +308,7 @@ void sort_stage_t::start_new_merges() {
 
         // no more runs at this level. Erase it so the special case
         // check works right
-        _run_map.erase(cur_level_it);
+        _run_map.erase(curr_level_it);
     }
 }
 
@@ -300,6 +345,7 @@ tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
 
 
 int sort_stage_t::process_packet() {
+
     sort_packet_t *packet = (sort_packet_t *)_adaptor->get_packet();
 
     _input = packet->input_buffer;
@@ -325,16 +371,17 @@ int sort_stage_t::process_packet() {
     key_vector_t array;
     array.reserve(tuple_count);
 
+
     // use a monitor thread to control the hierarchical merge
     thread_t *monitor;
     monitor = member_func_thread(this,
                                  &sort_stage_t::monitor_merge_packets,
                                  "merge monitor");
-    
     if(thread_create(&_monitor_thread, monitor)) {
         TRACE(TRACE_ALWAYS, "Unable to create the merge monitor thread");
         QPIPE_PANIC();
     }
+
 
     // create sorted runs
     do {
@@ -386,11 +433,12 @@ int sort_stage_t::process_packet() {
         
         // notify the merge monitor thread that another run is ready
         critical_section_t cs(&_monitor._lock);
-        _finished_merges[0].push_back(file_name);
+	run_list_t &runs = _run_map[0];
+        runs.push_back(file_name);
         _sorting_finished = eof;
         _monitor.notify_holding_lock();
 
-	TRACE(TRACE_DEBUG, "Added file %s to _finished_merges[0]\n", file_name.c_str());
+	TRACE(TRACE_DEBUG, "Added file %s to _run_map[0]\n", file_name.c_str());
 
     } while(!_sorting_finished);
     
@@ -485,7 +533,7 @@ static FILE *create_tmp_file(string &name) {
 
 
 
-void sort_stage_t::remove_input_files(const run_list_t &files) {
+void sort_stage_t::remove_input_files(run_list_t &files) {
     // delete the files from disk. The delete will occur as soon as
     // all current file handles are closed
     for(run_list_t::iterator it=files.begin(); it != files.end(); ++it) {

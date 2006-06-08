@@ -79,11 +79,12 @@ private:
 	string _output; // name of output file
 	run_list_t _inputs;
         tuple_buffer_t* _signal_buffer;
-        merge_t(const string &output, tuple_buffer_t *buf,
-		run_list_t::iterator begin, run_list_t::iterator end)
+	
+	merge_t () { }
+        merge_t(const string &output, const run_list_t &inputs, tuple_buffer_t * signal_buffer)
             : _output(output),
-	      _inputs(begin, end),
-	      _signal_buffer(buf)
+	      _inputs(inputs),
+	      _signal_buffer(signal_buffer)
         {
         }
     };
@@ -117,7 +118,6 @@ protected:
     
 private:
 
-    void remove_input_files(const run_list_t &files);
     bool final_merge_ready();
     int create_sorted_run(int page_count);
 
@@ -126,6 +126,7 @@ private:
     void check_finished_merges();
     void start_new_merges();
     void start_merge(int new_level, run_list_t &runs, int merge_factor);
+    void remove_input_files(run_list_t &files);
 };
 
 
