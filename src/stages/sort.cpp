@@ -58,42 +58,52 @@ static void flush_page(tuple_page_t *page, FILE *file,
  */
 void sort_stage_t::check_finished_merges() {
     // check for finished merges and 
-    run_list_t::iterator it = _current_merges.begin();
-    while(it != _current_merges.end()) {
-        // finished? 
-        if(it->_buffer->eof()) {
+    merge_map_t::iterator level_it = _merge_map.begin();
+    while(level_it != _merge_map.end()) {
+        int level = level_it->first;
+        merge_list_t &merges = level_it->second;
+        merge_list_t::iterator it = merges.begin();
+        while(it != merges.end()) {
+            // finished? 
+            if(it->_signal_buffer->eof()) {
 
-            // move it to the finished run list
-            _finished_merges[it->_merge_level].push_back(it->_file_name);
-	    TRACE(TRACE_DEBUG, "Merge output %s done\n", it->_file_name.c_str());
-	    TRACE(TRACE_DEBUG, "Added file %s to _finished_merges[%d]\n",
-		  it->_file_name.c_str(),
-		  it->_merge_level);
+                // move it to the finished run list
+                _run_map[level].push_back(it->_output);
+                TRACE(TRACE_DEBUG, "Merge output %s done\n", it->_output.c_str());
+                TRACE(TRACE_DEBUG, "Added file %s to _finished_merges[%d]\n",
+                      it->_output.c_str(),
+                      level);
 
-            // delete the merge record and any input files it used
-            remove_input_files(it->_buffer);
-            it = _current_merges.erase(it);
+                // delete the merge record and any input files it used
+                remove_input_files(it->_inputs);
+                it = merges.erase(it);
+            }
+            else {
+                // next!
+                ++it;
+            }
         }
-        else {
-            // next!
-            ++it;
-        }
+
+        // if that was the last merge at this level, remove it
+        merge_map_t::iterator old_level_it = level_it++;
+        if(merges.empty())
+            _merge_map.erase(old_level_it);
     }
 }
 
 
 
-void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
-                               int merge_factor) {
-    int level = entry->first;
-    name_list_t &names = entry->second;
-
-    // stores the files associated with this merge run
-    name_list_t input_files;
+void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor)
+{
+    
+    // allocate a new merge
+    merge_list_t &merges = _merge_map[new_level];
+    merges.resize(merges.size()+1);
+    merge_t &merge = merges.back();
     
     // create an fscan packet for each input run
     buffer_list_t fscan_buffers;
-    name_list_t::iterator it = names.begin();
+    run_list_t::iterator it = runs.begin();
     for(int i=0; i < merge_factor; i++) {
 
         fscan_packet_t *p;
@@ -111,10 +121,10 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
         fscan_buffers.push_back(buf);
 
         // add the file to the merge input list
-        input_files.push_back(it->data());
+        merge._inputs.push_back(it->data());
 
         // remove this element from the list
-        it = names.erase(it);
+        it = runs.erase(it);
     }
     
     // create a merge packet to consume the fscans
@@ -133,10 +143,9 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
     // fire it off
     dispatcher_t::dispatch_packet(mp);
 
-    // last merge run? Send it to the output buffer instead of fdump
-    if(_sorting_finished && _current_merges.empty() && _finished_merges.size() == 1) {
-        _current_merges.push_back(run_info_t(level+1, "", merge_out));
-        _merge_inputs[merge_out] = input_files;
+    // last merge run? Send it to the worker thread instead of fdump
+    if(new_level < 0) {
+        merge._signal_buffer = merge_out;
         return;
     }
                 
@@ -154,8 +163,8 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                             file_name.data(),
                             &_monitor);
     dispatcher_t::dispatch_packet(fp);
-    _current_merges.push_back(run_info_t(level+1, file_name, fdump_out));
-    _merge_inputs[fdump_out] = input_files;
+    merge._output = file_name;
+    merge._signal_buffer = fdump_out;
 }
 
 
@@ -167,82 +176,94 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
 void sort_stage_t::start_new_merges() {
 
     
-    TRACE(TRACE_DEBUG, "_finished_merged has size %d\n",
-	  _finished_merges.size());
+    TRACE(TRACE_DEBUG, "_run_map has size %d\n",
+	  _run_map.size());
     
 
     // start up as many new runs as possible
-    run_map_t::iterator it = _finished_merges.begin();
-    while(it != _finished_merges.end()) {
+    run_map_t::iterator level_it = _run_map.begin();
+    while(level_it != _run_map.end()) {
 
-        int level = it->first;
+        int level = level_it->first;
 	TRACE(TRACE_ALWAYS, "Running on level %d\n", level);
 
-        name_list_t &names = it->second;
-	while(names.size() >= MERGE_FACTOR)
+        
+        run_list_t &runs = level_it->second;
+        bool started_merges = false;
+	while(runs.size() >= MERGE_FACTOR) {
 	    // "normal" k-way merges
-            start_merge(it, MERGE_FACTOR);
+            start_merge(level+1, runs, MERGE_FACTOR);
+            started_merges = true;
+        }
 
-
-	TRACE(TRACE_DEBUG, "Started full k-way merges at level %d\n", level);
-	TRACE(TRACE_DEBUG, "%d files remaining at level %d\n",
-	      names.size(),
-	      level);
-        run_map_t::iterator tmp_it = it;
-	++tmp_it;
-	TRACE(TRACE_DEBUG, "%d files remaining at level %d\n",
-	      tmp_it->second.size(),
-	      tmp_it->first);
-	
-
+        // increment the iterator. rename for clarity
+        run_map_t::iterator cur_level_it = level_it++;
+        run_map_t::iterator next_level_it = level_it;
+        
+        // was that the last finished run at this level? erase it so
+        // the special case checks work right
+        if(runs.empty()) {
+            _run_map.erase(cur_level_it);
+            continue;
+        }
+        
         // special case -- if sorting has finished, we can't
         // necessarily wait for MERGE_FACTOR runs to arrive (they may
         // never come)
-        if(names.size() && _sorting_finished) {
-	    
+        if(!_sorting_finished || started_merges)
+            continue;
 
-            // try to find in-progress runs at or below this level
-            unsigned n = 0;
-            run_list_t::iterator run;
-	    // NGM changed > to <=
-	    for (run =_current_merges.begin(); run != _current_merges.end() && run->_merge_level <= level; ++run)
-	    {
-		TRACE(TRACE_DEBUG, "Detected in-progress run %s at level %d\n",
-		      run->_file_name.c_str(),
-		      run->_merge_level);
-                if(run->_merge_level == level+1)
-                    n++;
-            }
+        // try to find in-progress merges at or below this
+        // level. All runs below us should have been either merged
+        // or promoted in previous loop iterations
+        merge_map_t::iterator merges = _merge_map.begin();
+        int lowest_merge_level = (merges == _merge_map.end())? -1 : merges->first;
+        int next_run_level = (next_level_it == _run_map.end())? -1 : next_level_it->first;
 
-            // no in-progress runs?
-            if(run == _current_merges.end()) {
-                // should we start a partial merge at this level or
-                // promote the stragglers? At this point there are n
-                // >= 0 in-progress and (m >= 0) (finished) merges at
-                // the next level. Promote the current batch of
-                // stragglers if n+m+1 <= MERGE_FACTOR.
-                name_list_t &new_names = _finished_merges[level+1];
-                unsigned m = new_names.size();
-                if((m != 0) && (n + m < MERGE_FACTOR)) {
-                    // promote the stragglers up a level -- it won't cascade
-                    new_names.insert(new_names.end(), names.begin(), names.end());
-		    TRACE(TRACE_DEBUG, "Moved %d runs up to level %d\n",
-			  names.size(),
-			  level+1);
-                    names.clear();
-                }
-                else {
-                    // do a partial merge at this level
-                    start_merge(it, names.size());
-                }
-            }
+        // choose the lower of the two levels
+        int next_size;
+        int next_level;
+        if(lowest_merge_level > next_run_level) {
+            // only runs at the next level
+            next_size = next_level_it->second.size();
+            next_level = next_run_level;
+        }
+        else if(lowest_merge_level < next_run_level) {
+            // only merges at the next level
+            next_size = merges->second.size();
+            next_level = lowest_merge_level;
+        }
+        else if(lowest_merge_level < 0) {
+            // nothing above us -- last merge!
+            next_size = 0;
+            next_level = -1;
+        }
+        else {
+            // both runs and merges at the next level
+            next_size = merges->second.size() + next_level_it->second.size();
+            next_level = lowest_merge_level;
         }
 
-        // was that the last finished run at this level? erase it
-        // so the special case check works right
-        run_map_t::iterator old_it = it++;
-        if(names.empty()) 
-            _finished_merges.erase(old_it);
+        // activity below us? wait for it to finish first
+        if(next_level <= level)
+            continue;
+                
+        // promote or partial merge?
+        int required_merges = (next_size + MERGE_FACTOR-1)/MERGE_FACTOR;
+        int potential_merges = (next_size + runs.size() + MERGE_FACTOR-1)/MERGE_FACTOR;
+        if(potential_merges > required_merges) {
+            // partial merge
+            start_merge(next_level, runs, runs.size());
+        }
+        else {
+            // promote up
+            run_list_t &next_runs = _run_map[next_level];
+            next_runs.insert(next_runs.end(), runs.begin(), runs.end());
+        }
+
+        // no more runs at this level. Erase it so the special case
+        // check works right
+        _run_map.erase(cur_level_it);
     }
 }
 
@@ -270,8 +291,9 @@ tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
         start_new_merges();
 
         // have we started the final merge? The worker thread will take care of it
-        if(_sorting_finished && _finished_merges.empty() && _current_merges.size() == 1)
-            return _current_merges.front()._buffer;
+        merge_map_t::iterator merge = _merge_map.begin();
+        if(merge != _merge_map.end() && merge->first < 0)
+            return merge->second.front()._signal_buffer;
     }
 }
 
@@ -402,13 +424,14 @@ sort_stage_t::~sort_stage_t()  {
     }
 
     // also, remove any remaining temp files
-    file_map_t::iterator it=_merge_inputs.begin();
-    while(it != _merge_inputs.end()) {
-        tuple_buffer_t *buf = it->first;
-        // increment now because remove_input_files() would
-        // invalidate the iterator
-        ++it;
-        remove_input_files(buf);
+    merge_map_t::iterator level_it=_merge_map.begin();
+    while(level_it != _merge_map.end()) {
+        merge_list_t::iterator it = level_it->second.begin();
+        while(it != level_it->second.end()) {
+            remove_input_files(it->_inputs);
+            ++it;
+        }
+        ++level_it;
     }
 }
 
@@ -462,21 +485,12 @@ static FILE *create_tmp_file(string &name) {
 
 
 
-void sort_stage_t::remove_input_files(tuple_buffer_t *buf) {
-    // find the input files that fed this buffer
-    file_map_t::iterator names = _merge_inputs.find(buf);
-    if(names == _merge_inputs.end())
-        return;
-
+void sort_stage_t::remove_input_files(const run_list_t &files) {
     // delete the files from disk. The delete will occur as soon as
     // all current file handles are closed
-    name_list_t &files = names->second;
-    for(name_list_t::iterator it=files.begin(); it != files.end(); ++it) {
-        if(remove(it->data()))
-            TRACE(TRACE_ALWAYS, "Unable to remove temp file %s", it->data());
-	TRACE(TRACE_TEMP_FILE, "Removed finished temp file %s\n", it->data());
+    for(run_list_t::iterator it=files.begin(); it != files.end(); ++it) {
+        if(remove(it->c_str()))
+            TRACE(TRACE_ALWAYS, "Unable to remove temp file %s", it->c_str());
+	TRACE(TRACE_TEMP_FILE, "Removed finished temp file %s\n", it->c_str());
     }
-
-    // delete the entry
-    _merge_inputs.erase(names);
 }

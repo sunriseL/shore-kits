@@ -71,7 +71,7 @@ private:
     size_t _tuple_size;
     
 
-    typedef deque<string> run_list_t;
+    typedef list<string> run_list_t;
 
 
     // all information we need for an active merge
@@ -90,7 +90,7 @@ private:
 
     
     typedef map<int, run_list_t> run_map_t;
-    typedef vector<merge_t> merge_list_t;
+    typedef list<merge_t> merge_list_t;
     typedef map<int, merge_list_t> merge_map_t;
     typedef merge_packet_t::buffer_list_t buffer_list_t;
     typedef vector<key_tuple_pair_t> key_vector_t;
@@ -102,8 +102,8 @@ private:
     volatile bool _sorting_finished;
 
     // merge management
-    run_map_t _runs;
-    merge_map_t _merges;
+    run_map_t _run_map;
+    merge_map_t _merge_map;
 
 public:
 
@@ -117,7 +117,7 @@ protected:
     
 private:
 
-    void remove_input_files(tuple_buffer_t *buf);
+    void remove_input_files(const run_list_t &files);
     bool final_merge_ready();
     int create_sorted_run(int page_count);
 
@@ -125,7 +125,7 @@ private:
 
     void check_finished_merges();
     void start_new_merges();
-    void start_merge(run_map_t::iterator entry, int merge_factor);
+    void start_merge(int new_level, run_list_t &runs, int merge_factor);
 };
 
 

@@ -84,7 +84,7 @@ int main() {
     }
 
     static const int merge_factor = 5;
-    static const int count = 20000000;
+    static const int count = 200000;
     write_info_t merge_info[merge_factor];
     
     // generate a list of count unique tuples with merge_factor
