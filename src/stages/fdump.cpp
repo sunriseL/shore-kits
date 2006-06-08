@@ -4,6 +4,7 @@
 #include "qpipe_panic.h"
 #include "trace/trace.h"
 #include "tuple.h"
+#include "utils.h"
 
 
 
@@ -38,7 +39,7 @@ int fdump_stage_t::process_packet() {
 	return -1;
     }
 
-
+    
     tuple_buffer_t* input_buffer = packet->_input_buffer;
     input_buffer->init_buffer();
 
@@ -51,7 +52,8 @@ int fdump_stage_t::process_packet() {
 	    return -1;
 	}
     }
-
+    TRACE(TRACE_DEBUG, "Finished dump to file %s\n", filename);
+    
 
     return 0;
 }

@@ -9,7 +9,6 @@
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
-#include "dispatcher.h"
 #include "trace/trace.h"
 #include "qpipe_panic.h"
 
@@ -26,6 +25,8 @@ using namespace qpipe;
  *  @brief
  */
 struct fdump_packet_t : public packet_t {
+
+public:
     
     static const char* PACKET_TYPE;
 
@@ -112,6 +113,7 @@ public:
     fdump_stage_t() { }
 
     virtual ~fdump_stage_t() { }
+
 protected:
 
     virtual int process_packet();

@@ -37,10 +37,17 @@ int bnl_caching_join_stage_t::process_packet() {
     }
     TRACE(TRACE_ALWAYS, "Dumped right subtree into cache file %s\n", cache_filename.c_str());
     
-    
 
-    
+    tuple_buffer_t* input_buffer = packet->_left_buffer;
+    input_buffer->init_buffer();
 
+
+    // read the file; make sure the buffer pages get deleted
+    page_guard_t tuple_page;
+    while ( (tuple_page = input_buffer->get_page()) != NULL ) {
+	TRACE(TRACE_ALWAYS, "Read another page of %d tuples\n",
+	      tuple_page->tuple_count());
+    }
 
 
     return 0;

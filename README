@@ -1,5 +1,16 @@
 
 
+Ryan suggested that we don't need the client buffer after all. A stage
+can terminate queries by invoking close() on the packets above him and
+invoking either dispatcher_t::remove_packet() or delete on the packets
+below. The close() propagates up the tree to the client...
+
+dispatcher_t::remove_packet(): Once a stage dispatches a packet, it
+cannot touch it or free it. The stage that received the packet is now
+responsible for freeing it.
+
+
+
 Moved stop_accepting_packets() into adaptor since we must check the
 flag AND add to the packet list in one critical section. We move
 _stage_next_tuple counter into the adaptor since we must increment it

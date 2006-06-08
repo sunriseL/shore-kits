@@ -10,13 +10,14 @@ STAGES = \
    stages/merge.cpp \
    stages/fdump.cpp \
    stages/fscan.cpp \
-   stages/bnl_caching_join.cpp
+   stages/bnl_caching_join.cpp \
+   stages/tscan.cpp
+
 
 #\
    stages/scalar_aggregate.cpp \
-   stages/aggregate.cpp \
-   stages/merge.cpp \
-   stages/tscan.cpp
+   stages/aggregate.cpp
+
 
 
 TRACE = \

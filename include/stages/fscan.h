@@ -5,7 +5,6 @@
 
 #include <cstdio>
 
-#include "db_cxx.h"
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
@@ -66,9 +65,6 @@ struct fscan_packet_t : public packet_t {
 	// NULL so the destructor can know and not do a double-free().
 	free(_filename);
 	_filename = NULL;
-
-	// As for the output file, the meta-stage is responsible for
-	// deleting the file when it knows we are all done.
     }
 
 };

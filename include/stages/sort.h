@@ -18,11 +18,6 @@ using namespace qpipe;
 
 using std::string;
 
-/* exported constants */
-
-#define SORT_STAGE_NAME  "SORT"
-#define SORT_PACKET_TYPE "SORT"
-
 
 
 /* exported functions */
@@ -32,7 +27,11 @@ using std::string;
  *@brief Packet definition for the sort stage
  */
 struct sort_packet_t : public packet_t {
+
+public:
+
     static const char *PACKET_TYPE;
+
     tuple_buffer_t *input_buffer;
     tuple_comparator_t *compare;
 
@@ -42,13 +41,17 @@ struct sort_packet_t : public packet_t {
                   tuple_buffer_t *in_buffer,
                   tuple_filter_t *filt,
                   tuple_comparator_t *cmp)
-	: packet_t(packet_id, SORT_PACKET_TYPE, out_buffer, filt, client_buffer),
+	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, client_buffer),
           input_buffer(in_buffer),
           compare(cmp)
     {
     }
 
-    virtual void terminate_inputs();
+    virtual void terminate_inputs() {
+	// close the input buffer
+	input_buffer->close();
+    }
+
 };
 
 
@@ -58,6 +61,7 @@ struct sort_packet_t : public packet_t {
  * merges them into a single output run.
  */
 class sort_stage_t : public stage_t {
+
 private:
     static const size_t MERGE_FACTOR;
     
@@ -100,14 +104,17 @@ private:
     file_map_t _merge_inputs;
 
 public:
-    static const char *DEFAULT_STAGE_NAME;
+
+    static const char* DEFAULT_STAGE_NAME;
 
     ~sort_stage_t();
-    
-protected:
-    virtual int process_packet();
 
+protected:
+
+    virtual int process_packet();
+    
 private:
+
     void remove_input_files(tuple_buffer_t *buf);
     bool final_merge_ready();
     int create_sorted_run(int page_count);

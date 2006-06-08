@@ -1,4 +1,4 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+/* -*- mode:C++; c-basic-offset:4 -*- */
 #ifndef __TSCAN_H
 #define __TSCAN_H
 
@@ -6,7 +6,6 @@
 # include "tuple.h"
 # include "packet.h"
 # include "stage.h"
-# include "dispatcher.h"
 
 
 
@@ -23,43 +22,30 @@ using namespace qpipe;
 struct tscan_packet_t : public packet_t {
 
     static const char* PACKET_TYPE;
-    
+
+
+    Db* _db;
+   
 
     /**
-     *  @brief FSCAN packet constructor. Raw FSCANS should not be
-     *  mergeable based on not mergeable. They should be merged at the
-     *  meta-stage.
+     *  @brief TSCAN packet constructor. Currently no merging.
      */
     tscan_packet_t(char* packet_id,
 		   tuple_buffer_t* out_buffer,
 		   tuple_filter_t* filt,
 		   tuple_buffer_t* client_buffer,
-		   const char* filename)
-	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, client_buffer, false)
+		   Db* db)
+	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, client_buffer, false),
+	  _db(db)
     {
-	if ( asprintf(&_filename, "%s", filename) == -1 ) {
-	    TRACE(TRACE_ALWAYS, "asprintf() failed on filename %s\n",
-		  filename);
-	    QPIPE_PANIC();
-	}
     }
     
     virtual ~tscan_packet_t() {
     }
 
     virtual void terminate_inputs() {
-
-	// No input buffers to close. As for the input file, the
-	// meta-stage is responsible for deleting the file when it
-	// knows we are all done.
-
-	// No longer any need to store filename separately. Set it to
-	// NULL so the destructor can know and not do a double-free().
-	free(_filename);
-	_filename = NULL;
-
-	// As for the output file, the meta-stage is responsible for
-	// deleting the file when it knows we are all done.
+	// No input buffers to close. We will not be deleting the
+	// input table.
     }
 
 };
@@ -71,16 +57,18 @@ struct tscan_packet_t : public packet_t {
  */
 
 class tscan_stage_t : public stage_t {
+
 public:
-    tscan_stage_t()
-        : stage_t(TSCAN_STAGE_NAME)
-    {
-      // register with the dispatcher
-      dispatcher_t::register_stage(TSCAN_PACKET_TYPE, this);
-    }
+
+    static const char* DEFAULT_STAGE_NAME;
+
+    tscan_stage_t() { }
+
+    virtual ~tscan_stage_t() { }
 
 protected:
-    virtual int process_packet(packet_t *packet);
+
+    virtual int process_packet();
 };
 
 

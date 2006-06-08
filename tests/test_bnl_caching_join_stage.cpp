@@ -16,8 +16,10 @@ using namespace qpipe;
 
 
 
-int num_tuples = -1;
-
+struct write_info_s {
+    tuple_buffer_t* buffer;
+    int num_tuples;
+};
 
 
 /**
@@ -37,11 +39,12 @@ void* drive_stage(void* arg)
 
 void* write_tuples(void* arg)
 {
-    tuple_buffer_t* int_buffer = (tuple_buffer_t*)arg;
+    struct write_info_s* info = (struct write_info_s*)arg;
+    tuple_buffer_t* int_buffer = info->buffer;
 
     int_buffer->wait_init();
     
-    for (int i = 0; i < num_tuples; i++) {
+    for (int i = 0; i < info->num_tuples; i++) {
 	tuple_t in_tuple((char*)&i, sizeof(int));
 	if( int_buffer->put_tuple(in_tuple) ) {
 	    TRACE(TRACE_ALWAYS, "tuple_page->append_init() returned non-zero!\n");
@@ -63,13 +66,18 @@ int main(int argc, char* argv[]) {
     
     
     // parse output filename
-    if ( argc < 2 ) {
-	TRACE(TRACE_ALWAYS, "Usage: %s <count>\n", argv[0]);
+    if ( argc < 3 ) {
+	TRACE(TRACE_ALWAYS, "Usage: %s <count-left> <count-right>\n", argv[0]);
 	exit(-1);
     }
-    num_tuples = atoi(argv[1]);
-    if ( num_tuples == 0 ) {
+    int count_left = atoi(argv[1]);
+    if ( count_left == 0 ) {
 	TRACE(TRACE_ALWAYS, "Invalid tuple count %s\n", argv[1]);
+	exit(-1);
+    }
+    int count_right = atoi(argv[2]);
+    if ( count_right == 0 ) {
+	TRACE(TRACE_ALWAYS, "Invalid tuple count %s\n", argv[2]);
 	exit(-1);
     }
 
@@ -97,30 +105,40 @@ int main(int argc, char* argv[]) {
 	QPIPE_PANIC();
     }
     
-    
-    
-    // just need to pass one int at a time to the counter
-    tuple_buffer_t int_buffer(sizeof(int));
-    tuple_buffer_t signal_buffer(sizeof(int));
+
+    // create WRITER_LEFT
+    tuple_buffer_t writer_left_buffer(sizeof(int));
+    struct write_info_s writer_left_info = { &writer_left_buffer, count_left };
+    tester_thread_t* writer_left_thread =
+	new tester_thread_t(write_tuples, &writer_left_info, "LEFT_WRITER_THREAD");
+    if ( thread_create( NULL, writer_left_thread ) ) {
+	TRACE(TRACE_ALWAYS, "thread_create() failed\n");
+	QPIPE_PANIC();
+    }
 
 
-    tester_thread_t* writer_thread =
-	new tester_thread_t(write_tuples, &int_buffer, "WRITER_THREAD");
-    
-    if ( thread_create( NULL, writer_thread ) ) {
+    // create WRITER_RIGHT
+    tuple_buffer_t writer_right_buffer(sizeof(int));
+    struct write_info_s writer_right_info = { &writer_right_buffer, count_right };
+    tester_thread_t* writer_right_thread =
+	new tester_thread_t(write_tuples, &writer_right_info, "RIGHT_WRITER_THREAD");
+    if ( thread_create( NULL, writer_right_thread ) ) {
 	TRACE(TRACE_ALWAYS, "thread_create() failed\n");
 	QPIPE_PANIC();
     }
     
+
+
     // aggregate single count result (single int)
+    tuple_buffer_t signal_buffer(sizeof(int));
     bnl_caching_join_packet_t* packet = 
 	new bnl_caching_join_packet_t("BNL_CACHING_JOIN_PACKET",
 				      &signal_buffer,
 				      new tuple_filter_t(),
 				      NULL, // tuple_join_t!
 				      &signal_buffer,
-				      NULL, // left subtree
-				      &int_buffer);
+				      &writer_left_buffer,
+				      &writer_right_buffer);
     
     
     dispatcher_t::dispatch_packet(packet);

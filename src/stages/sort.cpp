@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <string>
 #include <cstdlib>
+
 #include <deque>
 #include <map>
 #include <list>
@@ -19,10 +20,7 @@ using std::deque;
 using std::map;
 using std::list;
 
-void sort_packet_t::terminate_inputs() {
-    // close the input buffer
-    input_buffer->close();
-}
+
 
 struct tuple_less_t {
     tuple_comparator_t *cmp;
@@ -36,48 +34,21 @@ struct tuple_less_t {
 
 
 
-/**
- * @brief opens a temporary file with a unique name
- *
- * @param name string to store the new file's name in
- *
- * @return the file or NULL on error
- */
-static FILE *create_tmp_file(string &name) {
-    // TODO: use a configurable temp dir
-    char name_template[] = "tmp/sort-run.XXXXXX";
-    int fd = mkstemp(name_template);
-    if(fd < 0) {
-        TRACE(TRACE_ALWAYS, "Unable to open temporary file %s!\n",
-              name_template);
-        QPIPE_PANIC();
-    }
-
-    // open a stream on the file
-    FILE *file = fdopen(fd, "w");
-    if(!file) {
-        TRACE(TRACE_ALWAYS, "Unable to open a stream on %s\n",
-              name_template);
-        QPIPE_PANIC();
-    }
-
-    name = string(name_template);
-    return file;
-}
+const char* sort_packet_t::PACKET_TYPE = "SORT";
 
 
-/**
- * @brief flush (page) to (file) and clear it. PANIC on error.
- */
+
+const char* sort_stage_t::DEFAULT_STAGE_NAME = "SORT_STAGE";
+
+
+
+const size_t sort_stage_t::MERGE_FACTOR = 3;
+
+
+
+static FILE *create_tmp_file(string &name);
 static void flush_page(tuple_page_t *page, FILE *file,
-                       const string &file_name) {
-    if(page->fwrite_full_page(file)) {
-        TRACE(TRACE_ALWAYS, "Error writing sorted run to file\n",
-              file_name.data());
-        QPIPE_PANIC();
-    }
-    page->clear();
-}
+                       const string &file_name);
 
 
 
@@ -93,6 +64,8 @@ void sort_stage_t::check_finished_merges() {
         if(it->_buffer->eof()) {
             // move it to the finished run list
             _finished_merges[it->_merge_level].push_back(it->_file_name);
+	    
+	    TRACE(TRACE_DEBUG, "Merge output %s done\n", it->_file_name.c_str());
 
             // delete the merge record and any input files it used
             remove_input_files(it->_buffer);
@@ -104,6 +77,8 @@ void sort_stage_t::check_finished_merges() {
         }
     }
 }
+
+
 
 void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                                int merge_factor) {
@@ -123,6 +98,7 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
                                new tuple_filter_t(),
                                _adaptor->get_packet()->client_buffer,
                                it->data());
+	TRACE(TRACE_ALWAYS, "Created FSCAN on merge input %s\n", it->data());
 
         // dispatch the packet
         dispatcher_t::dispatch_packet(p);
@@ -175,6 +151,8 @@ void sort_stage_t::start_merge(sort_stage_t::run_map_t::iterator entry,
     _current_merges.push_back(run_info_t(level+1, file_name, fdump_out));
     _merge_inputs[fdump_out] = input_files;
 }
+
+
 
 /**
  * @brief searches each level of the merge hierarchy and fires off a
@@ -231,6 +209,8 @@ void sort_stage_t::start_new_merges() {
     }
 }
 
+
+
 /**
  * @brief Executed by a separate thread to manage the hierachical
  * merge. Spends most of its time blocked, so very little overhead --
@@ -258,7 +238,7 @@ tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
     }
 }
 
-const size_t sort_stage_t::MERGE_FACTOR = 3;
+
 
 int sort_stage_t::process_packet() {
     sort_packet_t *packet = (sort_packet_t *)_adaptor->get_packet();
@@ -372,6 +352,8 @@ int sort_stage_t::process_packet() {
     return 0;
 }
 
+
+
 sort_stage_t::~sort_stage_t()  {
     // make sure the monitor thread exits before we do...
     if(_monitor_thread && pthread_join(_monitor_thread, NULL)) {
@@ -390,6 +372,56 @@ sort_stage_t::~sort_stage_t()  {
     }
 }
 
+
+
+/**
+ * @brief flush (page) to (file) and clear it. PANIC on error.
+ */
+static void flush_page(tuple_page_t *page, FILE *file,
+                       const string &file_name) {
+    if(page->fwrite_full_page(file)) {
+        TRACE(TRACE_ALWAYS, "Error writing sorted run to file\n",
+              file_name.data());
+        QPIPE_PANIC();
+    }
+    page->clear();
+}
+
+
+
+/**
+ * @brief opens a temporary file with a unique name
+ *
+ * @param name string to store the new file's name in
+ *
+ * @return the file or NULL on error
+ */
+static FILE *create_tmp_file(string &name) {
+    // TODO: use a configurable temp dir
+    char name_template[] = "tmp/sort-run.XXXXXX";
+    int fd = mkstemp(name_template);
+    if(fd < 0) {
+        TRACE(TRACE_ALWAYS, "Unable to open temporary file %s!\n",
+              name_template);
+        QPIPE_PANIC();
+    }
+    TRACE(TRACE_TEMP_FILE, "Created temp file %s\n", name_template);
+
+
+    // open a stream on the file
+    FILE *file = fdopen(fd, "w");
+    if(!file) {
+        TRACE(TRACE_ALWAYS, "Unable to open a stream on %s\n",
+              name_template);
+        QPIPE_PANIC();
+    }
+
+    name = string(name_template);
+    return file;
+}
+
+
+
 void sort_stage_t::remove_input_files(tuple_buffer_t *buf) {
     // find the input files that fed this buffer
     file_map_t::iterator names = _merge_inputs.find(buf);
@@ -401,7 +433,8 @@ void sort_stage_t::remove_input_files(tuple_buffer_t *buf) {
     name_list_t &files = names->second;
     for(name_list_t::iterator it=files.begin(); it != files.end(); ++it) {
         if(remove(it->data()))
-            TRACE(TRACE_ALWAYS, "Unable to remove file '%s'", it->data());
+            TRACE(TRACE_ALWAYS, "Unable to remove temp file %s", it->data());
+	TRACE(TRACE_TEMP_FILE, "Removed finished temp file %s\n", it->data());
     }
 
     // delete the entry

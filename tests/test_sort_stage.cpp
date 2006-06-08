@@ -17,6 +17,10 @@ using std::vector;
 
 using namespace qpipe;
 
+
+int values = 1800;
+
+
 /**
  *  @brief Simulates a worker thread on the specified stage.
  *
@@ -36,7 +40,6 @@ void* write_tuples(void* arg)
     tuple_buffer_t *buffer = (tuple_buffer_t *)arg;
 
     // produce a set of inputs, with duplicated values
-    static const int values = 2500;
     static const int copies = 5;
     vector<int> inputs;
     for(int i=0; i < values; i++)
@@ -76,9 +79,26 @@ struct int_tuple_comparator_t : public tuple_comparator_t {
     }
 };
 
-int main() {
+
+
+int main(int argc, char* argv[]) {
 
     thread_init();
+    
+
+    // usage: test_sort_stage <values> [off]
+    if ( argc >= 2 ) {
+	values = atoi(argv[1]);
+	if (values == 0) {
+	    TRACE(TRACE_ALWAYS, "%s is not a number\n", argv[1]);
+	    exit(-1);
+	}
+    }
+    bool do_echo = true;
+    if ( (argc >= 3) && !strcmp(argv[2], "off") )
+	do_echo = false;
+
+
 
     stage_container_t* sc;
 
@@ -106,7 +126,8 @@ int main() {
         QPIPE_PANIC();
     }
 
-     sc = new stage_container_t("SORT_CONTAINER", new stage_factory<sort_stage_t>);
+    sc = new stage_container_t("SORT_CONTAINER", new stage_factory<sort_stage_t>);
+    dispatcher_t::register_stage_container(sort_packet_t::PACKET_TYPE, sc);
     tester_thread_t* sort_thread = new tester_thread_t(drive_stage, sc, "SORT THREAD");
     if ( thread_create( NULL, sort_thread ) ) {
         TRACE(TRACE_ALWAYS, "thread_create failed\n");
@@ -135,12 +156,15 @@ int main() {
                                               filter,
                                               compare);
 
-    sc->enqueue(packet);
+    dispatcher_t::dispatch_packet(packet);
     
     tuple_t output;
     output_buffer.init_buffer();
-    while(output_buffer.get_tuple(output))
-        TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
+    while(output_buffer.get_tuple(output)) {
+	if (do_echo)
+	    TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
+    }
 
+    TRACE(TRACE_ALWAYS, "TEST_DONE\n");
     return 0;
 }
