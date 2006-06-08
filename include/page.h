@@ -143,6 +143,22 @@ public:
     page_t *read();
     bool write(page_t *page);
 
+    /**
+     * @brief non-blocking method to check whether input is currently
+     * available.
+     *
+     * @return 0 if input is available, 1 if not, and -1 if eof
+     */
+    int check_readable();
+
+    /**
+     * @brief non-blocking method to check whether space is currently
+     * available
+     *
+     * @return 0 if there is space, 1 if not, and -1 if buffer closed
+     */
+    int check_writable();
+    
     void stop_reading();
     void stop_writing();
 
@@ -151,6 +167,29 @@ public:
     
 private:
     void init(int capacity, int threshold);
+
+    /**
+     * @brief determines whether we must acquire the lock and update
+     * the read size guess before it is safe to read
+     *
+     * See comments in the read() implementation about the guess == 1
+     * corner case
+     */
+    bool must_verify_read() { return read_size_guess == 1; }
+    bool must_verify_write() { return write_size_guess == capacity; }
+
+    /**
+     * @brief commits any uncommitted reads. CALLER MUST HOLD THE LOCK!
+     */
+    void commit_reads() {
+        size -= uncommitted_read_count;
+        uncommitted_read_count = 0;
+    }
+
+    void commit_writes() {
+        size += uncommitted_write_count;
+        uncommitted_write_count = 0;
+    }
 };
 
 

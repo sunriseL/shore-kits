@@ -659,7 +659,19 @@ public:
     }
 
 
-    int wait_for_input(); 
+    int wait_for_input();
+
+    
+    /**
+     * @brief Non-blocking check for available inputs.
+     *
+     * @return 0 if inputs are available, 1 if not, and -1 if eof
+     */
+    int check_for_input() {
+        return read_page? 0 : page_buffer.check_readable();
+    }
+
+        
     void close();
     void send_eof();
 
@@ -669,18 +681,12 @@ public:
      *  buffer. In other words, returns true if and only if the
      *  producer has closed its end of the buffer and we have read
      *  every tuple of every page in this buffer.
+     *
      */
 
     bool eof() {
-
-        return page_buffer.stopped_writing()
-            && page_buffer.empty()
-	    
-	    // The final read_page remains allocated until
-	    // tuple_buffer_t is destroyed
-            && read_iterator == read_page->end();
+        return check_for_input() < 0;
     }
- 
 
     void init_buffer();
     int wait_init(bool block=true);

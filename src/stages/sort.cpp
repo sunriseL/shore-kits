@@ -189,19 +189,38 @@ void sort_stage_t::start_new_merges() {
         while(names.size() >= MERGE_FACTOR)
             start_merge(it, MERGE_FACTOR);
 
-        // special case -- after sorting finishes always merge the
-        // lowest level with no in-progress runs to ensure forward
-        // progress
+        // special case -- after sorting finishes don't wait for
+        // MERGE_FACTOR runs to arrive (they won't). 
         if(names.size() && _sorting_finished) {
-            // try to find in-progress runs for this level (or
-            // below). NOTE: since the list is sorted, lowest runs
-            // first, the we only need to check the first entry
+            // try to find in-progress runs at or below this level
+            unsigned n = 0;
             run_list_t::iterator run=_current_merges.begin();
-
+            while(run != _current_merges.end() && run->_merge_level > level) {
+                if(run->_merge_level == level+1)
+                    n++;
+                
+                ++run;
+            }
+            
             // no in-progress runs?
-            if(run == _current_merges.end() || run->_merge_level > level)
-                start_merge(it, names.size());
-                    
+            if(run == _current_merges.end()) {
+                // should we start a partial merge at this level or
+                // promote the stragglers? At this point there are n
+                // >= 0 (m >= 0) in-progress (finished) merges at the
+                // next level. Promote the current batch of stragglers
+                // if n+m+1 <= MERGE_FACTOR.
+                name_list_t &new_names = _finished_merges[level+1];
+                unsigned m = new_names.size();
+                if(n + m < MERGE_FACTOR) {
+                    // promote the stragglers up a level -- it won't cascade
+                    new_names.insert(new_names.end(), names.begin(), names.end());
+                    names.clear();
+                }
+                else {
+                    // do a partial merge at this level
+                    start_merge(it, names.size());
+                }
+            }
         }
 
         // was that the last finished run at this level? erase it

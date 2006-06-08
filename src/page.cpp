@@ -87,8 +87,7 @@ void page_buffer_t::stop_writing() {
     
     // Do a final update of the buffer size so the consumer does not
     // miss any of our recent additions.
-    size += uncommitted_write_count;
-    uncommitted_write_count = 0;
+    commit_writes();
 
     // Mark the buffer so the consumer knows to stop once it has done
     // a final drain.
@@ -101,6 +100,39 @@ void page_buffer_t::stop_writing() {
 }
 
 
+int page_buffer_t::check_readable() {
+    // if the guess says we need to block, update it in hopes that it
+    // was wrong
+    if(must_verify_read()) {
+        critical_section_t cs(&lock);
+        commit_reads();
+        read_size_guess = size;
+    }
+    
+    // pages available?
+    if(read_size_guess)
+        return 0;
+
+    // eof or just slow?
+    return done_writing? -1 : 1;
+}
+
+int page_buffer_t::check_writable() {
+    // if the guess says we need to block, update it in hopes that it
+    // was wrong
+    if(must_verify_write()) {
+        critical_section_t cs(&lock);
+        commit_writes();
+        write_size_guess = size;
+    }
+
+    // closed by reader?
+    if(done_reading)
+        return -1;
+    
+    // ready, or not?
+    return (write_size_guess < capacity)? 0 : 1;
+}
 
 /**
  *  @brief Read a page from the buffer. If we are down to one page in
@@ -117,16 +149,14 @@ page_t *page_buffer_t::read() {
     // Treat the one-page-left case separately. We avoid the
     // head==tail corner case by never allowing the buffer to empty
     // completely until the producer is finished)
-    if(read_size_guess == 1) {
+    if(must_verify_read()) {
 
         // * * * BEGIN CRITICAL SECTION * * *
         critical_section_t cs(&lock);
 
         // We are probably going to wait for the buffer to fill
         // up. Before we deschedule ourselves, update the buffer size.
-        size -= uncommitted_read_count;
-        uncommitted_read_count = 0;
-
+        commit_reads();
             
         // We want to avoid a thrashing scenario where the producer
         // inserts one page and immediately yields to us, we remove
@@ -176,8 +206,7 @@ page_t *page_buffer_t::read() {
         critical_section_t cs(&lock);
         
         // update the size and notify the producer
-        size -= uncommitted_read_count;
-        uncommitted_read_count = 0;
+        commit_reads();
         pthread_cond_signal_wrapper(&write_notify);
         
         // * * * END CRITICAL SECTION * * *
@@ -209,14 +238,13 @@ bool page_buffer_t::write(page_t *page) {
     
     
     // possibly full? (no corner case to worry about here)
-    if(write_size_guess == capacity) {
+    if(must_verify_write()) {
 
         // * * * BEGIN CRITICAL SECTION * * *
         critical_section_t cs(&lock);
 
         // update the size and notify the consumer
-        size += uncommitted_write_count;
-        uncommitted_write_count = 0;
+        commit_writes();
                 
         // Want to avoid the same thrashing scenario with read(). This
         // time, wait for amount of free space in buffer to drop below
@@ -267,8 +295,7 @@ bool page_buffer_t::write(page_t *page) {
         critical_section_t cs(&lock);
 
         // update the count and notify the consumer
-        size += uncommitted_write_count;
-        uncommitted_write_count = 0;
+        commit_writes();
         pthread_cond_signal_wrapper(&read_notify);
             
         // * * * END CRITICAL SECTION * * *
