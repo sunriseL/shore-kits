@@ -201,11 +201,11 @@ public:
 	    ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
 	    ( tuple->L_QUANTITY < (QUANTITY)) )
 	    {
-		//printf("+");
+		printf("+");
 		return (true);
 	    }
 	else {
-	    //printf(".");
+	    printf(".");
 	    return (false);
 	}
 
@@ -227,13 +227,11 @@ public:
 	/* Should project L_EXTENDEDPRICE & L_DISCOUNT */
 
 	// Calculate L_EXTENDEDPRICE
-	double *l_extendedprice = (double *)(src.data + 4*sizeof(int) + 1*sizeof(double));
-	memcpy(dest.data, l_extendedprice, sizeof(double));
+	tpch_lineitem_tuple *at = (tpch_lineitem_tuple*)(src.data);
 
-	double *l_discount = l_extendedprice + 1*sizeof(double);
-	memcpy(dest.data + sizeof(double), l_discount, sizeof(double));
+	memcpy(dest.data,& at->L_EXTENDEDPRICE, sizeof(double));
+	memcpy(dest.data + sizeof(double), &at->L_DISCOUNT, sizeof(double));
     }
-
 };
 
 
@@ -352,7 +350,7 @@ int main() {
     double * d = NULL;
     while(tscan_out_buffer.get_tuple(output)) {
 	d = (double*)output.data;
-	TRACE(TRACE_ALWAYS, "Read ID: EXT=%.2f - DISC=%.2f\n", d[0], d[1]);
+	TRACE(TRACE_ALWAYS, "Read ID: EXT=%lf - DISC=%lf\n", d[0], d[1]);
     }
 
     try {    

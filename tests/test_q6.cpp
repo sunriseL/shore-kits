@@ -229,11 +229,10 @@ public:
 	/* Should project L_EXTENDEDPRICE & L_DISCOUNT */
 
 	// Calculate L_EXTENDEDPRICE
-	double *l_extendedprice = (double *)(src.data + 4*sizeof(int) + 1*sizeof(double));
-	memcpy(dest.data, l_extendedprice, sizeof(double));
+	tpch_lineitem_tuple *at = (tpch_lineitem_tuple*)(src.data);
 
-	double *l_discount = l_extendedprice + sizeof(double);
-	memcpy(dest.data + sizeof(double), l_discount, sizeof(double));
+	memcpy(dest.data,& at->L_EXTENDEDPRICE, sizeof(double));
+	memcpy(dest.data + sizeof(double), &at->L_DISCOUNT, sizeof(double));
     }
 
 };
@@ -258,13 +257,15 @@ public:
 	sum = 0.0;
     }
   
-    bool aggregate(tuple_t &, const tuple_t &) {
+    bool aggregate(tuple_t &, const tuple_t & src) {
 
 	// update COUNT and SUM
 	count++;
-	
+	double * d = (double*)src.data;
+	sum += d[0] * d[1];
+    
 	if(count % 10 == 0) {
-	    TRACE(TRACE_DEBUG, "%d\n", count);
+	    TRACE(TRACE_DEBUG, "%d - %lf\n", count, sum);
 	    fflush(stdout);
 	}
 
@@ -272,7 +273,7 @@ public:
     }
 
     bool eof(tuple_t &dest) {
-	*(int*)dest.data = count;
+	*(double*)dest.data = sum;
 	return true;
     }
 };
@@ -393,7 +394,7 @@ int main() {
 
     // AGG PACKET CREATION
     // the output consists of 2 int
-    tuple_buffer_t  agg_output_buffer(2*sizeof(int));
+    tuple_buffer_t  agg_output_buffer(sizeof(double));
     tuple_filter_t* agg_filter = new tuple_filter_t();
     count_aggregate_t*  q6_aggregator = new count_aggregate_t();
     
