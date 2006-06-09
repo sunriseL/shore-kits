@@ -457,9 +457,11 @@ int sort_stage_t::process_packet() {
     
     // transfer the output of the last merge to the stage output
     tuple_t out;
-    while(merge_output->get_tuple(out))
-        if(_adaptor->output(out))
-            return 1;
+    while(merge_output->get_tuple(out)) {
+        adaptor_t::output_t result = _adaptor->output(out);
+        if(result)
+            return result;
+    }
 
     return 0;
 }

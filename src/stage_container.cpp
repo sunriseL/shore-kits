@@ -340,13 +340,20 @@ void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
     int process_ret = stage->process();
     stop_accepting_packets();
 
-
-    if ( process_ret ) {
+    switch(process_ret) {
+    case stage_t::adaptor_t::OUTPUT_RETURN_STOP:
+        break;
+        
+    case stage_t::adaptor_t::OUTPUT_RETURN_ERROR:
 	TRACE(TRACE_ALWAYS, "process_packet() returned error. Aborting queries...\n");
 	abort_queries();
 	assert (_packet_list->empty());
 	delete _packet_list;
 	return;
+        
+    default:
+        TRACE(TRACE_ALWAYS, "process_packet() returned an invalid result\n");
+        QPIPE_PANIC();
     }
 
     // Walk through _stage_packets and re-enqueue the packets which

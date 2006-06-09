@@ -107,22 +107,9 @@ int tscan_stage_t::process_packet() {
 	    //  tuple_index,
 	    //  bulk_read_index);
 
-	    tuple_t current_tuple((char*)data.get_data(), packet->output_buffer->tuple_size);
-
-	    stage_t::adaptor_t::output_t output_ret = adaptor->output(current_tuple);
-
-	    switch (output_ret) {
-	    case stage_t::adaptor_t::OUTPUT_RETURN_CONTINUE:
-		continue;
-	    case stage_t::adaptor_t::OUTPUT_RETURN_STOP:
-		return 0;
-	    case stage_t::adaptor_t::OUTPUT_RETURN_ERROR:
-		return -1;
-	    default:
-		TRACE(TRACE_ALWAYS, "adaptor->output() return unrecognized value %d\n",
-		      output_ret);
-		QPIPE_PANIC();
-	    }
+	    adaptor_t::output_t output_ret = adaptor->output(data);
+            if(output_ret)
+                return output_ret;
         }
     }
 
