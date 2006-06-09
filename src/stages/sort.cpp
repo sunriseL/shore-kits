@@ -346,7 +346,7 @@ tuple_buffer_t *sort_stage_t::monitor_merge_packets() {
 
 
 
-int sort_stage_t::process_packet() {
+stage_t::result_t sort_stage_t::process_packet() {
 
     sort_packet_t *packet = (sort_packet_t *)_adaptor->get_packet();
 
@@ -358,7 +358,7 @@ int sort_stage_t::process_packet() {
     // do we even have any inputs?
     _input->init_buffer();
     if(_input->wait_for_input())
-        return 0;
+        return stage_t::RESULT_STOP;
     
     // create a buffer page for writing to file
     page_guard_t out_page = tuple_page_t::alloc(_tuple_size, malloc);
@@ -452,18 +452,18 @@ int sort_stage_t::process_packet() {
     _monitor_thread = 0;
     if(merge_output == NULL) {
         TRACE(TRACE_ALWAYS, "Merge failed. Bailing out early.");
-        return 1;
+        return stage_t::RESULT_ERROR;
     }
     
     // transfer the output of the last merge to the stage output
     tuple_t out;
     while(merge_output->get_tuple(out)) {
-        adaptor_t::output_t result = _adaptor->output(out);
+        result_t result = _adaptor->output(out);
         if(result)
             return result;
     }
 
-    return 0;
+    return stage_t::RESULT_STOP;
 }
 
 

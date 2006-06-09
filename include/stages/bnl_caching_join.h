@@ -82,7 +82,7 @@ public:
     
 protected:
 
-    virtual int process_packet();
+    virtual result_t process_packet();
 
     int create_cache_file(string &name, bnl_caching_join_packet_t* packet);
 };

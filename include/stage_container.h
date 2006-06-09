@@ -80,7 +80,7 @@ protected:
             return _packet;
         }
 
-        virtual output_t output(const tuple_t &tuple);
+        virtual stage_t::result_t output(const tuple_t &tuple);
 	
 	virtual void stop_accepting_packets() {
 	    critical_section_t cs(&_stage_adaptor_lock);
@@ -119,7 +119,7 @@ protected:
     void container_queue_enqueue(packet_t* packet);
     packet_list_t* container_queue_dequeue();
 
-    stage_t::adaptor_t::output_t output(packet_list_t* packets, const tuple_t &tuple);
+    stage_t::result_t output(packet_list_t* packets, const tuple_t &tuple);
     void abort_query(packet_list_t* packets);
 
 public:

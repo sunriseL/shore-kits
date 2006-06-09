@@ -91,11 +91,12 @@ void merge_stage_t::insert_sorted(buffer_head_t *head)
     prev->next = head;
 }
 
-const char *merge_packet_t::PACKET_TYPE = "Merge";
-const char *merge_stage_t::DEFAULT_STAGE_NAME = "Merge";
+const char *merge_packet_t::PACKET_TYPE = "MERGE";
+const char *merge_stage_t::DEFAULT_STAGE_NAME = "MERGE_STAGE";
 
 
-int merge_stage_t::process_packet() {
+stage_t::result_t merge_stage_t::process_packet() {
+
     merge_packet_t *packet = (merge_packet_t *)_adaptor->get_packet();
 
     typedef merge_packet_t::buffer_list_t buffer_list_t;
@@ -122,18 +123,15 @@ int merge_stage_t::process_packet() {
         _head_list = head->next;
 
         // output it
-        if(_adaptor->output(head->tuple))
-            return 1;
+        result_t result = _adaptor->output(head->tuple);
+	if (result)
+	    return result;
 
         // put it back?
-        if(i == 512877) 
-            printf("Uh-oh\n");
         if(head->has_tuple())
             insert_sorted(head);
-        else
-            printf("Input exhausted\n");
     }
 
     // done!
-    return 0;
+    return stage_t::RESULT_STOP;
 }

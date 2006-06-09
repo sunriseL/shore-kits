@@ -23,7 +23,7 @@ const char* fdump_stage_t::DEFAULT_STAGE_NAME = "FDUMP_STAGE";
  *  should terminate all queries it is processing.
  */
 
-int fdump_stage_t::process_packet() {
+stage_t::result_t fdump_stage_t::process_packet() {
 
     adaptor_t* adaptor = _adaptor;
     fdump_packet_t* packet = (fdump_packet_t*)adaptor->get_packet();
@@ -34,7 +34,7 @@ int fdump_stage_t::process_packet() {
     file_guard_t file = fopen(filename, "w+");
     if (file == NULL) {
 	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n", filename);
-	return -1;
+	return stage_t::RESULT_ERROR;
     }
 
     
@@ -47,11 +47,11 @@ int fdump_stage_t::process_packet() {
     while ( (tuple_page = input_buffer->get_page()) != NULL ) {
 	if (tuple_page->fwrite_full_page(file) ) {
 	    TRACE(TRACE_ALWAYS, "fwrite_full_page() failed\n");
-	    return -1;
+	    return stage_t::RESULT_ERROR;
 	}
     }
     TRACE(TRACE_DEBUG, "Finished dump to file %s\n", filename);
     
 
-    return 0;
+    return stage_t::RESULT_STOP;
 }

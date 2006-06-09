@@ -89,9 +89,9 @@ public:
     
 protected:
 
-    virtual int process_packet();
+    virtual result_t process_packet();
     
-    int read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple_page);
+    result_t read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple_page);
 };
 
 

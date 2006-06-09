@@ -131,8 +131,7 @@ packet_list_t* stage_container_t::container_queue_dequeue() {
  *  unrecoverable error. process() should probably propagate this
  *  error up.
  */
-stage_t::adaptor_t::output_t
-stage_container_t::stage_adaptor_t::output(const tuple_t &tuple) {
+stage_t::result_t stage_container_t::stage_adaptor_t::output(const tuple_t &tuple) {
 
     packet_list_t::iterator it, end;
     unsigned int next_tuple;
@@ -186,8 +185,8 @@ stage_container_t::stage_adaptor_t::output(const tuple_t &tuple) {
     
     
     if ( packets_remaining )
-	return OUTPUT_RETURN_CONTINUE;
-    return OUTPUT_RETURN_STOP;
+	return stage_t::RESULT_CONTINUE;
+    return stage_t::RESULT_STOP;
 }
 
 
@@ -341,10 +340,10 @@ void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
     stop_accepting_packets();
 
     switch(process_ret) {
-    case stage_t::adaptor_t::OUTPUT_RETURN_STOP:
+    case stage_t::RESULT_STOP:
         break;
         
-    case stage_t::adaptor_t::OUTPUT_RETURN_ERROR:
+    case stage_t::RESULT_ERROR:
 	TRACE(TRACE_ALWAYS, "process_packet() returned error. Aborting queries...\n");
 	abort_queries();
 	assert (_packet_list->empty());
@@ -352,7 +351,8 @@ void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
 	return;
         
     default:
-        TRACE(TRACE_ALWAYS, "process_packet() returned an invalid result\n");
+        TRACE(TRACE_ALWAYS, "process_packet() returned an invalid result %d\n",
+	      process_ret);
         QPIPE_PANIC();
     }
 

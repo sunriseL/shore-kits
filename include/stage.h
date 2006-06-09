@@ -26,17 +26,18 @@ class stage_t {
 
 public:
 
+    typedef enum {
+	RESULT_CONTINUE = 0,
+	RESULT_STOP,
+	RESULT_ERROR
+    } result_t;
+
+
     struct adaptor_t {
 
-	typedef enum {
-	    OUTPUT_RETURN_CONTINUE = 0,
-	    OUTPUT_RETURN_STOP,
-	    OUTPUT_RETURN_ERROR
-	} output_t;
-	
 	virtual const char* get_container_name()=0;
         virtual packet_t* get_packet()=0;
-        virtual output_t output(const tuple_t &tuple)=0;
+        virtual result_t output(const tuple_t &tuple)=0;
 
 	virtual void stop_accepting_packets()=0;	
 
@@ -48,7 +49,7 @@ protected:
 
     adaptor_t* _adaptor;
 
-    virtual int process_packet()=0;
+    virtual result_t process_packet()=0;
 
 public:
 
@@ -74,7 +75,7 @@ public:
      *  terminate all queries that it is currently involved in
      *  computing.
      */
-    int process() {
+    result_t process() {
 	assert(_adaptor != NULL);
 	return process_packet();
     }

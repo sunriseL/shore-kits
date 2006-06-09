@@ -116,7 +116,7 @@ public:
 
 protected:
 
-    virtual int process_packet();
+    virtual result_t process_packet();
 };
 
 

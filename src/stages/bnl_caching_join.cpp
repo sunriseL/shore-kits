@@ -23,7 +23,7 @@ const char* bnl_caching_join_stage_t::DEFAULT_STAGE_NAME = "BNL_CACHING_JOIN_STA
  *  should terminate all queries it is processing.
  */
 
-int bnl_caching_join_stage_t::process_packet() {
+stage_t::result_t bnl_caching_join_stage_t::process_packet() {
 
     adaptor_t* adaptor = _adaptor;
     bnl_caching_join_packet_t* packet = (bnl_caching_join_packet_t*)adaptor->get_packet();
@@ -33,7 +33,7 @@ int bnl_caching_join_stage_t::process_packet() {
     string cache_filename;
     if ( create_cache_file(cache_filename, packet) ) {
 	TRACE(TRACE_ALWAYS, "create_cache_file() failed\n");
-	return -1;
+	return stage_t::RESULT_ERROR;
     }
     TRACE(TRACE_ALWAYS, "Dumped right subtree into cache file %s\n", cache_filename.c_str());
     
@@ -50,7 +50,7 @@ int bnl_caching_join_stage_t::process_packet() {
     }
 
 
-    return 0;
+    return stage_t::RESULT_STOP;
 }
 
 
@@ -72,7 +72,7 @@ int bnl_caching_join_stage_t::create_cache_file(string &name, bnl_caching_join_p
     if(fd < 0) {
         TRACE(TRACE_ALWAYS, "mkstemp() failed on %s\n",
               name_template);
-        return -1;
+	return -1;
     }
     if ( close(fd) ) {
 	TRACE(TRACE_ALWAYS, "fclose() failed on temp file %s\n",

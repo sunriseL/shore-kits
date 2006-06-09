@@ -23,16 +23,17 @@ struct aggregate_packet_t : public packet_t {
 
     static const char* PACKET_TYPE;
   
-    tuple_buffer_t *input_buffer;
-    tuple_aggregate_t *aggregate;
+    tuple_buffer_t* _input_buffer;
+    tuple_aggregate_t* _aggregate;
+
     aggregate_packet_t(char *packet_id,
 		       tuple_buffer_t *out_buffer,
 		       tuple_filter_t *filt,
-		       tuple_buffer_t *in_buffer,
-		       tuple_aggregate_t *agg)
-	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, in_buffer, false),
-	 input_buffer(in_buffer),
-	 aggregate(agg)
+		       tuple_buffer_t *input_buffer,
+		       tuple_aggregate_t *aggregate)
+	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, NULL, false),
+	  _input_buffer(input_buffer),
+	  _aggregate(aggregate)
     {
     }
 
@@ -41,7 +42,7 @@ struct aggregate_packet_t : public packet_t {
 
     virtual void terminate_inputs() {
 	// TODO detect close() error and delete input_buffer
-	input_buffer->close();
+	_input_buffer->close();
     }
 
 };
@@ -66,7 +67,7 @@ public:
 
  protected:
 
-    virtual int process_packet();
+    virtual result_t process_packet();
 };
 
 

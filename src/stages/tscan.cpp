@@ -43,7 +43,7 @@ struct cursor_guard_t {
  *  should terminate all queries it is processing.
  */
 
-int tscan_stage_t::process_packet() {
+stage_t::result_t tscan_stage_t::process_packet() {
 
     adaptor_t* adaptor = _adaptor;
     tscan_packet_t* packet = (tscan_packet_t*)adaptor->get_packet();
@@ -57,7 +57,7 @@ int tscan_stage_t::process_packet() {
     if (ret) {
         db->err(ret, "db->cursor() failed: ");
 	TRACE(TRACE_ALWAYS, "db->cursor() failed\n");
-	return -1;
+	return stage_t::RESULT_ERROR;
     }
     cursor_guard_t cursor_guard(db, dbcp);
     
@@ -89,11 +89,11 @@ int tscan_stage_t::process_packet() {
 	    if (err != DB_NOTFOUND) {
 		db->err(err, "dbcp->get() failed: ");
 		TRACE(TRACE_ALWAYS, "dbcp->get failed\n");
-		return -1;
+		return stage_t::RESULT_ERROR;
 	    }
 	    
 	    // done reading table
-	    return 0;
+	    return stage_t::RESULT_STOP;
 	}
 
 
@@ -107,7 +107,7 @@ int tscan_stage_t::process_packet() {
 	    //  tuple_index,
 	    //  bulk_read_index);
 
-	    adaptor_t::output_t output_ret = adaptor->output(data);
+	    result_t output_ret = adaptor->output(data);
             if(output_ret)
                 return output_ret;
         }

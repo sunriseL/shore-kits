@@ -22,7 +22,7 @@ const char* fscan_stage_t::DEFAULT_STAGE_NAME = "FSCAN_STAGE";
  *  should terminate all queries it is processing.
  */
 
-int fscan_stage_t::process_packet() {
+stage_t::result_t fscan_stage_t::process_packet() {
 
     adaptor_t* adaptor = _adaptor;
     fscan_packet_t* packet = (fscan_packet_t*)adaptor->get_packet();
@@ -32,7 +32,7 @@ int fscan_stage_t::process_packet() {
     file_guard_t file = fopen(filename, "r");
     if ( file == NULL ) {
 	TRACE(TRACE_ALWAYS, "fopen() failed on %s\n", filename);
-	return -1;
+	return stage_t::RESULT_ERROR;
     }
     
 
@@ -40,16 +40,15 @@ int fscan_stage_t::process_packet() {
 	tuple_page_t::alloc(packet->output_buffer->tuple_size, malloc);
     if ( tuple_page == NULL ) {
 	TRACE(TRACE_ALWAYS, "tuple_page_t::alloc() failed\n");
-	return -1;
+	return stage_t::RESULT_ERROR;
     }
 
-    int read_ret = read_file(adaptor, file, tuple_page);
-    return read_ret;
+    return read_file(adaptor, file, tuple_page);
 }
 
 
 
-int fscan_stage_t::read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple_page) {
+stage_t::result_t fscan_stage_t::read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple_page) {
 
 
    // If we have FSCAN working sharing enabled, we could be accepting
@@ -63,13 +62,13 @@ int fscan_stage_t::read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple
 	int read_ret = tuple_page->fread_full_page(file);
 	if ( read_ret ==  1 ) {
 	    // done reading the file
-	    return 0;
+	    return stage_t::RESULT_STOP;
 	}
 
 	if ( read_ret == -1 ) {
 	    // short read! treat this as an error!
 	    TRACE(TRACE_ALWAYS, "tuple_page_t::fread() failed\n");
-	    return -1;
+	    return stage_t::RESULT_ERROR;
 	}
 
 
@@ -86,7 +85,7 @@ int fscan_stage_t::read_file(adaptor_t* adaptor, FILE* file, tuple_page_t* tuple
 	tuple_page_t::iterator it;
 	for (it = tuple_page->begin(); it != tuple_page->end(); ++it) {
 	    tuple_t current_tuple = *it;
-	    adaptor_t::output_t output_ret = adaptor->output(current_tuple);
+	    stage_t::result_t output_ret = adaptor->output(current_tuple);
             if(output_ret)
                 return output_ret;
 	}

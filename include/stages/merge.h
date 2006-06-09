@@ -74,8 +74,8 @@ public:
     }
     
 protected:
-    virtual int process_packet();
-
+    virtual result_t process_packet();
+    
 private:
     void insert_sorted(buffer_head_t *head);
 };
