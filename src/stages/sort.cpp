@@ -533,6 +533,36 @@ static FILE *create_tmp_file(string &name) {
     return file;
 }
 
+int sort_stage_t::print_runs() {
+    run_map_t::iterator level_it = _run_map.begin();
+    for( ; level_it != _run_map.end(); ++level_it) {
+        int level = level_it->first;
+        run_list_t &runs = level_it->second;
+        printf("Level %d (%d):\n", level, runs.size());
+        run_list_t::iterator it = runs.begin();
+        for( ; it != runs.end(); ++it)
+            printf("\t%s\n", it->c_str());
+    }
+    return 0;
+}
+
+int sort_stage_t::print_merges() {
+    merge_map_t::iterator level_it = _merge_map.begin();
+    for( ; level_it != _merge_map.end(); ++level_it) {
+        int level = level_it->first;
+        merge_list_t &merges = level_it->second;
+        printf("Level %d (%d)\n", level, merges.size());
+        merge_list_t::iterator it = merges.begin();
+        for( ; it != merges.end(); ++it) {
+            printf("\t%s <=\n", it->_output.c_str());
+            run_list_t::iterator run_it = it->_inputs.begin();
+            for( ; run_it != it->_inputs.end(); ++run_it) 
+                printf("\t\t%s\n", run_it->c_str());
+        }
+    }
+    return 0;
+}
+
 
 
 void sort_stage_t::remove_input_files(run_list_t &files) {

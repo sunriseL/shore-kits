@@ -127,6 +127,10 @@ private:
     void start_new_merges();
     void start_merge(int new_level, run_list_t &runs, int merge_factor);
     void remove_input_files(run_list_t &files);
+
+    // debug
+    int print_runs();
+    int print_merges();
 };
 
 
