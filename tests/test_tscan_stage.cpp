@@ -171,6 +171,8 @@ public:
 	gettimeofday(&tv, 0);
 	mn = tv.tv_usec * getpid();
 	QUANTITY = 24 + fabs((float)(rand_r(&mn))/(float)(RAND_MAX+1));
+
+	TRACE(TRACE_DEBUG, "Q6 - DISCOUNT = %.2f. QUANTITY = %.2f\n", DISCOUNT, QUANTITY);
     }
 
 
@@ -184,7 +186,15 @@ public:
 	   L_QUANTITY < QUANTITY
 	*/
 
-	tpch_lineitem_tuple *tuple = (tpch_lineitem_tuple*)&input.data;
+	tpch_lineitem_tuple *tuple = (tpch_lineitem_tuple*)input.data;
+
+	/*
+	  printf("%d - %d\t", (int)tuple->L_SHIPDATE, (int)t1);
+	  printf("%d - %d\t", (int)tuple->L_SHIPDATE, (int)t2);
+	  printf("%.2f - %.2f\t", tuple->L_DISCOUNT, DISCOUNT - 0.01);
+	  printf("%.2f - %.2f\t", tuple->L_DISCOUNT, DISCOUNT + 0.01);
+	  printf("%.2f - %.2f\n", tuple->L_QUANTITY, QUANTITY);
+	*/
 
 	if  ( ( tuple->L_SHIPDATE >= t1 ) &&
 	    ( tuple->L_SHIPDATE < t2 ) &&
@@ -192,11 +202,11 @@ public:
 	    ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
 	    ( tuple->L_QUANTITY < (QUANTITY)) )
 	    {
-		printf("+");
+		//printf("+");
 		return (true);
 	    }
 	else {
-	    printf(".");
+	    //printf(".");
 	    return (false);
 	}
 
@@ -342,7 +352,7 @@ int main() {
     double * d = NULL;
     while(tscan_out_buffer.get_tuple(output)) {
 	d = (double*)output.data;
-        TRACE(TRACE_ALWAYS, "Read ID: EXT=%.2f - DISC=%.f2\n", d[0], d[1]);
+	TRACE(TRACE_ALWAYS, "Read ID: EXT=%.2f - DISC=%.2f\n", d[0], d[1]);
     }
 
     try {    
