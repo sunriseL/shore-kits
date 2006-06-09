@@ -102,7 +102,11 @@ int main(int argc, char* argv[]) {
     
     // aggregate single count result (single int)
     fdump_packet_t* packet = 
-	new fdump_packet_t("FDUMP_PACKET", &signal_buffer, &int_buffer, &signal_buffer, input_filename);
+	new fdump_packet_t("FDUMP_PACKET", 
+			   &signal_buffer, 
+			   &int_buffer, 
+			   &signal_buffer, 
+			   input_filename);
     
     
     dispatcher_t::dispatch_packet(packet);

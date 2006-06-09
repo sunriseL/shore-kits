@@ -11,11 +11,11 @@ bin_PROGRAMS = \
    test_fdump_stage \
    test_fscan_stage \
    test_bnl_caching_join_stage \
+   test_tscan_stage \
    test_sort_stage
 
 #\
 	       test_aggregate_stage \
-	       test_tscan_stage \
 	       test_q6
 
 test_trace_SOURCES = test_trace.cpp

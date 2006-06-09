@@ -78,13 +78,13 @@ int tscan_stage_t::process_packet() {
     bulk_data.set_flags(DB_DBT_USERMEM);
 
 
+    int bulk_reads =0;
+
     for (int bulk_read_index = 0; ; bulk_read_index++) {
 
-	
-	TRACE(TRACE_DEBUG,"Bulk read %d\n", bulk_read_index);
+	TRACE(TRACE_ALWAYS, "%d\n", ++bulk_reads);
 
-
-        int err = dbcp->get(&bulk_key, &bulk_data, DB_MULTIPLE_KEY | DB_NEXT);
+	int err = dbcp->get(&bulk_key, &bulk_data, DB_MULTIPLE_KEY | DB_NEXT);
 	if (err) {
 	    if (err != DB_NOTFOUND) {
 		db->err(err, "dbcp->get() failed: ");
@@ -103,15 +103,14 @@ int tscan_stage_t::process_packet() {
         DbMultipleKeyDataIterator it = bulk_data;
 	for (int tuple_index = 0; it.next(key, data); tuple_index++) {
 
-	    TRACE(TRACE_DEBUG, "Reading tuple %d in bulk read %d\n",
-		  tuple_index,
-		  bulk_read_index);
-
+	    //    TRACE(TRACE_DEBUG, "Reading tuple %d in bulk read %d\n",
+	    //  tuple_index,
+	    //  bulk_read_index);
 
 	    tuple_t current_tuple((char*)data.get_data(), packet->output_buffer->tuple_size);
 
-
 	    stage_t::adaptor_t::output_t output_ret = adaptor->output(current_tuple);
+
 	    switch (output_ret) {
 	    case stage_t::adaptor_t::OUTPUT_RETURN_CONTINUE:
 		continue;
