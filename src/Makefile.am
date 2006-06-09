@@ -11,12 +11,12 @@ STAGES = \
    stages/fscan.cpp \
    stages/bnl_caching_join.cpp \
    stages/tscan.cpp \
-   stages/sort.cpp
-
+   stages/sort.cpp \
+   stages/aggregate.cpp
 
 #\
-   stages/scalar_aggregate.cpp \
-   stages/aggregate.cpp
+   stages/scalar_aggregate.cpp
+
 
 
 

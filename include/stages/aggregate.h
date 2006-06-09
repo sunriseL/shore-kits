@@ -3,38 +3,47 @@
 #ifndef __AGGREGATE_H
 #define __AGGREGATE_H
 
+#include <cstdio>
+
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
-#include "dispatcher.h"
+#include "trace/trace.h"
+#include "qpipe_panic.h"
 
 
 
 using namespace qpipe;
-
-# define AGGREGATE_PACKET_TYPE "AGGREGATE"
-
 
 /**
  *  @brief Packet definition for the aggregation stage.
  */
 
 struct aggregate_packet_t : public packet_t {
+
+    static const char* PACKET_TYPE;
   
     tuple_buffer_t *input_buffer;
     tuple_aggregate_t *aggregate;
     aggregate_packet_t(char *packet_id,
 		       tuple_buffer_t *out_buffer,
-		       tuple_buffer_t *in_buffer,
 		       tuple_filter_t *filt,
+		       tuple_buffer_t *in_buffer,
 		       tuple_aggregate_t *agg)
-	: packet_t(packet_id, AGGREGATE_PACKET_TYPE, out_buffer, filt),
+	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, in_buffer, false),
 	 input_buffer(in_buffer),
 	 aggregate(agg)
     {
     }
 
-    virtual void terminate();
+    virtual ~aggregate_packet_t() {
+    }
+
+    virtual void terminate_inputs() {
+	// TODO detect close() error and delete input_buffer
+	input_buffer->close();
+    }
+
 };
 
 
@@ -45,20 +54,19 @@ struct aggregate_packet_t : public packet_t {
  */
 
 class aggregate_stage_t : public stage_t {
- public:
-    aggregate_stage_t()
-	: stage_t("AGGREGATE_STAGE")
-	{
-	    // register with the dispatcher
-	    dispatcher_t::register_stage(AGGREGATE_PACKET_TYPE, this);
-	}
+
+public:
+
+    static const char* DEFAULT_STAGE_NAME;
+
+    aggregate_stage_t() { }
 
     ~aggregate_stage_t() { }
 
 
  protected:
-    virtual int process_packet(packet_t *packet);
 
+    virtual int process_packet();
 };
 
 

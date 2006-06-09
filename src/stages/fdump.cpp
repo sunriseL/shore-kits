@@ -19,8 +19,6 @@ const char* fdump_stage_t::DEFAULT_STAGE_NAME = "FDUMP_STAGE";
 /**
  *  @brief Write the file specified by fdump_packet_t p.
  *
- *  @param p An fdump_packet_t.
- *
  *  @return 0 on success. Non-zero on unrecoverable error. The stage
  *  should terminate all queries it is processing.
  */

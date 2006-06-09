@@ -125,7 +125,6 @@ time_t datestr_to_timet(char* str) {
 
 // Q6 TSCAN FILTER 
 
-
 /* Specific filter for this client */
 
 class q6_tscan_filter_t : public tuple_filter_t {
@@ -323,7 +322,8 @@ int main() {
     catch ( std::exception &en) {
 	TRACE(TRACE_ALWAYS, "std::exception\n");
     }
-    
+
+    // TSCAN PACKET
     // the output consists of 2 doubles
     tuple_buffer_t tscan_out_buffer(2*sizeof(double));
     tuple_filter_t *tscan_filter = new q6_tscan_filter_t();

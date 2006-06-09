@@ -1,15 +1,32 @@
 // -*- mode:C++ c-basic-offset:4 -*-
 
+/** @file    : test_q6.cpp
+ *  @brief   : Unittest for Q6
+ *  @author  : Ippokratis Pandis
+ *  @version : 0.1
+ *  @history :
+ 8/6/2006 : Updated to work with the new class definitions
+ 25/5/2006: Initial version
+*/ 
+
 #include "thread.h"
-#include "tester_thread.h"
+#include "stage_container.h"
 #include "stages/tscan.h"
 #include "stages/aggregate.h"
 #include "trace/trace.h"
 #include "qpipe_panic.h"
+#include "dispatcher.h"
+#include "tester_thread.h"
+
+#include <unistd.h>
+#include <sys/time.h>
+#include <math.h>
 
 using namespace qpipe;
 
 
+
+// Q6 SPECIFIC UTILS
 /* Declaration of some constants */
 
 # define DATABASE_HOME	 "."
@@ -27,35 +44,35 @@ size_t TPCH_BUFFER_POOL_SIZE_BYTES = 450 * 1024 * 1024; /* 450 MB */
 /* tpch_l_shipmode.
    TODO: Unnecessary */
 enum tpch_l_shipmode {
-	REG_AIR,
-	AIR,
-	RAIL,
-	TRUCK,
-	MAIL,
-	FOB,
-	SHIP
+    REG_AIR,
+    AIR,
+    RAIL,
+    TRUCK,
+    MAIL,
+    FOB,
+    SHIP
 };
 
 
 /* Lineitem tuple.
    TODO: Catalog will provide this metadata info */
 struct tpch_lineitem_tuple {
-  int L_ORDERKEY;
-  int L_PARTKEY;
-  int L_SUPPKEY;
-  int L_LINENUMBER;
-  double L_QUANTITY;
-  double L_EXTENDEDPRICE;
-  double L_DISCOUNT;
-  double L_TAX;
-  char L_RETURNFLAG;
-  char L_LINESTATUS;
-  time_t L_SHIPDATE;
-  time_t L_COMMITDATE;
-  time_t L_RECEIPTDATE;
-  char L_SHIPINSTRUCT[25];
-  tpch_l_shipmode L_SHIPMODE;
-  // char L_COMMENT[44];
+    int L_ORDERKEY;
+    int L_PARTKEY;
+    int L_SUPPKEY;
+    int L_LINENUMBER;
+    double L_QUANTITY;
+    double L_EXTENDEDPRICE;
+    double L_DISCOUNT;
+    double L_TAX;
+    char L_RETURNFLAG;
+    char L_LINESTATUS;
+    time_t L_SHIPDATE;
+    time_t L_COMMITDATE;
+    time_t L_RECEIPTDATE;
+    char L_SHIPINSTRUCT[25];
+    tpch_l_shipmode L_SHIPMODE;
+    // char L_COMMENT[44];
 };
 
 
@@ -76,87 +93,210 @@ int tpch_lineitem_bt_compare_fcn(Db*, const Dbt* k1, const Dbt* k2) {
 }
 
 
+/** @fn    : datestr_to_timet(char*)
+ *  @brief : Converts a string to corresponding time_t
+ */
+
+time_t datestr_to_timet(char* str) {
+    char buf[100];
+    strcpy(buf, str);
+
+    // str in yyyy-mm-dd format
+    char* year = buf;
+    char* month = buf + 5;
+    // char* day = buf + 8;
+
+    buf[4] = '\0';
+    buf[7] = '\0';
+
+    tm time_str;
+    time_str.tm_year = atoi(year) - 1900;
+    time_str.tm_mon = atoi(month) - 1;
+    time_str.tm_mday = 4;
+    time_str.tm_hour = 0;
+    time_str.tm_min = 0;
+    time_str.tm_sec = 1;
+    time_str.tm_isdst = -1;
+
+    return mktime(&time_str);
+}
+
+
+// END OF: Q6 SPECIFIC UTILS
+
+
+// Q6 TSCAN FILTER 
+
+/* Specific filter for this client */
+
+class q6_tscan_filter_t : public tuple_filter_t {
+
+private:
+    /* Our predicate is represented by these fields. The predicate stays
+       constant throughout the execution of the query. */
+
+    time_t t1;
+    time_t t2;
+
+    struct timeval tv;
+    uint mn;
+
+    /* Random predicates */
+    /* TPC-H specification 2.3.0 */
+
+    /* DATE is 1st Jan. of year [1993 .. 1997] */
+    int DATE;
+
+    /* DISCOUNT is random [0.02 .. 0.09] */
+    double DISCOUNT;
+
+    /* QUANTITY is randon [24 .. 25] */
+    double QUANTITY;
+
+public:
+
+    /* Initialize the predicates */
+    q6_tscan_filter_t() : tuple_filter_t() {
+	t1 = datestr_to_timet("1997-01-01");
+	t2 = datestr_to_timet("1998-01-01");
+
+	/* Calculate random predicates */
+	gettimeofday(&tv, 0);
+	mn = tv.tv_usec * getpid();
+	DATE = 1993 + abs((int)(5*(float)(rand_r(&mn))/(float)(RAND_MAX+1)));
+
+	gettimeofday(&tv, 0);
+	mn = tv.tv_usec * getpid();
+	DISCOUNT = 0.02 + (float)(fabs((float)(rand_r(&mn))/(float)(RAND_MAX+1)))/(float)14.2857142857143;
+
+	gettimeofday(&tv, 0);
+	mn = tv.tv_usec * getpid();
+	QUANTITY = 24 + fabs((float)(rand_r(&mn))/(float)(RAND_MAX+1));
+
+	TRACE(TRACE_DEBUG, "Q6 - DISCOUNT = %.2f. QUANTITY = %.2f\n", DISCOUNT, QUANTITY);
+    }
+
+
+    /* Predication */
+    virtual bool select(const tuple_t &input) {
+
+	/* Predicate:
+	   L_SHIPDATE >= DATE AND
+	   L_SHIPDATE < DATE + 1 YEAR AND
+	   L_DISCOUNT BETWEEN DISCOUNT - 0.01 AND DISCOUNT + 0.01 AND
+	   L_QUANTITY < QUANTITY
+	*/
+
+	tpch_lineitem_tuple *tuple = (tpch_lineitem_tuple*)input.data;
+
+	/*
+	  printf("%d - %d\t", (int)tuple->L_SHIPDATE, (int)t1);
+	  printf("%d - %d\t", (int)tuple->L_SHIPDATE, (int)t2);
+	  printf("%.2f - %.2f\t", tuple->L_DISCOUNT, DISCOUNT - 0.01);
+	  printf("%.2f - %.2f\t", tuple->L_DISCOUNT, DISCOUNT + 0.01);
+	  printf("%.2f - %.2f\n", tuple->L_QUANTITY, QUANTITY);
+	*/
+
+	if  ( ( tuple->L_SHIPDATE >= t1 ) &&
+	      ( tuple->L_SHIPDATE < t2 ) &&
+	      ( tuple->L_DISCOUNT >= (DISCOUNT - 0.01)) &&
+	      ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
+	      ( tuple->L_QUANTITY < (QUANTITY)) )
+	    {
+		//printf("+");
+		return (true);
+	    }
+	else {
+	    //printf(".");
+	    return (false);
+	}
+
+	/*
+	// TODO: Should ask the Catalog
+	double* d_discount = (double*)(input.data + 4*sizeof(int)+3*sizeof(double));
+
+	// all the lineitems with discount > 0.04 pass the filter
+        if (*d_discount > 0.04) {
+	//	    TRACE(TRACE_DEBUG, "Passed Filtering:\t %.2f\n", *d_discount);
+	return (true);
+	}
+	*/
+    }
+    
+    /* Projection */
+    virtual void project(tuple_t &dest, const tuple_t &src) {
+
+	/* Should project L_EXTENDEDPRICE & L_DISCOUNT */
+
+	// Calculate L_EXTENDEDPRICE
+	double *l_extendedprice = (double *)(src.data + 4*sizeof(int) + 1*sizeof(double));
+	memcpy(dest.data, l_extendedprice, sizeof(double));
+
+	double *l_discount = l_extendedprice + sizeof(double);
+	memcpy(dest.data + sizeof(double), l_discount, sizeof(double));
+    }
+
+};
+
+
+// END OF: Q6 TSCAN FILTER
+
+
+
+// Q6 AGG
+
+class count_aggregate_t : public tuple_aggregate_t {
+
+private:
+    int count;
+    double sum;
+    
+public:
+  
+    count_aggregate_t() {
+	count = 0;
+	sum = 0.0;
+    }
+  
+    bool aggregate(tuple_t &, const tuple_t &) {
+
+	// update COUNT and SUM
+	count++;
+	
+	if(count % 10 == 0) {
+	    TRACE(TRACE_DEBUG, "%d\n", count);
+	    fflush(stdout);
+	}
+
+	return false;
+    }
+
+    bool eof(tuple_t &dest) {
+	*(int*)dest.data = count;
+	return true;
+    }
+};
+
+// END OF: Q6 AGG
+
+
 
 /** @fn    : void * drive_stage(void *)
  *  @brief : Simulates a worker thread on the specified stage.
  *  @param : arg A stage_t* to work on.
  */
 
-void *drive_stage(void *arg)
-{
-    stage_t *stage = (stage_t *)arg;
+void *drive_stage(void *arg) {
 
-    while(1) {
-        stage->process_next_packet();
-    }
-
+    stage_container_t* sc = (stage_container_t*)arg;
+    sc->run();
+    
     return NULL;
 }
 
 
-
-/* Specific TBSCAN filter for this client */
-
-/* @TODO: tscan_filter should record the first (rid) and when it meets it again
-   it should signal that it finished the processing */
-
-
-class q6_filter_t : public tuple_filter_t {
-
-public:
-    virtual bool select(const tuple_t & input) {
-	// TODO: Should ask the Catalog
-	double* d_discount = (double*)(input.data + 4*sizeof(int)+3*sizeof(double));
-
-	/* all the lineitems with discount > 0.04 pass the filter */
-        if (*d_discount > 0.04) {
-	    TRACE(TRACE_DEBUG, "Passed Filtering:\t %.2f\n", *d_discount);
-	    return (true);
-	}
-
-	return (false);
-    }
-    
-    virtual void project(tuple_t &dest, const tuple_t &src) {
-
-	memcpy(dest.data, src.data, dest.size);
-    }
-
-};
-
-
-
-/* Count aggregator */
-
-class count_aggregate_t : public tuple_aggregate_t {
-
-private:
-  int count;
-    
-public:
-  
-  count_aggregate_t() {
-    count = 0;
-  }
-  
-  bool aggregate(tuple_t &, const tuple_t &) {
-      if(count++ % 1000 == 0) {
-        printf(".");
-        fflush(stdout);
-      }
-    return false;
-  }
-
-  bool eof(tuple_t &dest) {
-    *(int*)dest.data = count;
-    return true;
-  }
-};
-
-
-
 /** @fn    : main
- *  @brief : Calls a table scan and outputs a specific projection
+ *  @brief : TPC-H Q6
  */
 
 int main() {
@@ -164,23 +304,32 @@ int main() {
     thread_init();
 
     // creates a TSCAN stage
-    tscan_stage_t *tscan_stage = new tscan_stage_t();
-    tester_thread_t* tscan_thread = new tester_thread_t(drive_stage, tscan_stage, "TSCAN THREAD");
-    if ( thread_create( NULL, tscan_thread ) ) {
+    stage_container_t* tscan_sc = 
+	new stage_container_t("TSCAN_CONTAINER", new stage_factory<tscan_stage_t>);
+
+    dispatcher_t::register_stage_container(tscan_packet_t::PACKET_TYPE, tscan_sc);
+
+    tester_thread_t* tscan_thread = new tester_thread_t(drive_stage, tscan_sc, "TSCAN THREAD");
+
+    if ( thread_create(NULL, tscan_thread) ) {
 	TRACE(TRACE_ALWAYS, "thread_create failed\n");
 	QPIPE_PANIC();
     }
-
 
     // creates a AGG stage
-    aggregate_stage_t *agg_stage = new aggregate_stage_t();
-    tester_thread_t* aggregate_thread = new tester_thread_t(drive_stage, agg_stage, "AGGREGATE THREAD");
-    if ( thread_create( NULL, aggregate_thread ) ) {
+    stage_container_t* agg_sc = 
+	new stage_container_t("AGG_CONTAINER", new stage_factory<aggregate_stage_t>);
+
+    dispatcher_t::register_stage_container(aggregate_packet_t::PACKET_TYPE, agg_sc);
+
+    tester_thread_t* agg_thread = new tester_thread_t(drive_stage, agg_sc, "AGG THREAD");
+
+    if ( thread_create(NULL, agg_thread) ) {
 	TRACE(TRACE_ALWAYS, "thread_create failed\n");
 	QPIPE_PANIC();
     }
 
-
+    // OPENS THE LINEITEM TABLE
     Db* tpch_lineitem = NULL;
     DbEnv* dbenv = NULL;
 
@@ -229,41 +378,44 @@ int main() {
     }
     
 
-    
-    // TSCAN PACKET CREATION
-    // the tbscan output consists of 1 integer
-    tuple_buffer_t q6_tscan_output_buffer(sizeof(int));
-    tuple_filter_t *q6_tscan_filter = new q6_filter_t();
-        
-    tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
-							 tpch_lineitem,
-							 /* TODO: Should get that size from Catalog */
-							 sizeof(tpch_lineitem_tuple),
-							 &q6_tscan_output_buffer,
-							 q6_tscan_filter);
 
+    // TSCAN PACKET
+    // the output consists of 2 doubles
+    tuple_buffer_t tscan_out_buffer(2*sizeof(double));
+    tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
+
+
+    tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
+							 &tscan_out_buffer,
+							 tscan_filter,
+							 NULL, /* no need for client_buffer */
+							 tpch_lineitem);
 
     // AGG PACKET CREATION
-    // the output is always a single int
-    tuple_buffer_t  q6_agg_output_buffer(sizeof(int));
-    tuple_filter_t* q6_agg_filter = new tuple_filter_t();
+    // the output consists of 2 int
+    tuple_buffer_t  agg_output_buffer(2*sizeof(int));
+    tuple_filter_t* agg_filter = new tuple_filter_t();
     count_aggregate_t*  q6_aggregator = new count_aggregate_t();
     
     aggregate_packet_t* q6_agg_packet = new aggregate_packet_t("test aggregate",
-							       &q6_agg_output_buffer,
-							       &q6_tscan_output_buffer,
-							       q6_agg_filter,
+							       &agg_output_buffer,
+							       agg_filter,
+							       &tscan_out_buffer,
 							       q6_aggregator);
-    
-    // ENQUEUE PACKETS
-    agg_stage->enqueue(q6_agg_packet);
-    tscan_stage->enqueue(q6_tscan_packet);
+
+
+    // Dispatch packet
+    dispatcher_t::dispatch_packet(q6_tscan_packet);
+    dispatcher_t::dispatch_packet(q6_agg_packet);
     
     tuple_t output;
-    q6_agg_output_buffer.init_buffer();
+    agg_output_buffer.init_buffer();
 
-    while(q6_agg_output_buffer.get_tuple(output))
-      TRACE(TRACE_ALWAYS, "*** Q6 Count: %d ***\n", *(int*)output.data);
+    int * r = NULL;
+    while(agg_output_buffer.get_tuple(output)) {
+	r = (int*)output.data;
+	TRACE(TRACE_ALWAYS, "*** Q6 Count: %d. Sum: %d.  ***\n", r[0], r[1]);
+    }
 
     try {    
 	// closes file and environment

@@ -11,22 +11,16 @@
 
 using namespace qpipe;
 
-
-
-/* exported functions */
-
-
 /**
  *@brief Packet definition for the Tscan stage
  */
+
 struct tscan_packet_t : public packet_t {
 
     static const char* PACKET_TYPE;
 
-
     Db* _db;
    
-
     /**
      *  @brief TSCAN packet constructor. Currently no merging.
      */
