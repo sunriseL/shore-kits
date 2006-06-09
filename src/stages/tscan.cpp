@@ -82,7 +82,7 @@ stage_t::result_t tscan_stage_t::process_packet() {
 
     for (int bulk_read_index = 0; ; bulk_read_index++) {
 
-	TRACE(TRACE_ALWAYS, "%d\n", ++bulk_reads);
+	TRACE(TRACE_DEBUG, "%d\n", ++bulk_reads);
 
 	int err = dbcp->get(&bulk_key, &bulk_data, DB_MULTIPLE_KEY | DB_NEXT);
 	if (err) {

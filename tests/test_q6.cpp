@@ -24,6 +24,7 @@
 
 using namespace qpipe;
 
+extern uint32_t trace_current_setting;
 
 
 // Q6 SPECIFIC UTILS
@@ -156,7 +157,7 @@ private:
 public:
 
     /* Initialize the predicates */
-    q6_tscan_filter_t() : tuple_filter_t() {
+    q6_tscan_filter_t() : tuple_filter_t(sizeof(tpch_lineitem_tuple)) {
 	t1 = datestr_to_timet("1997-01-01");
 	t2 = datestr_to_timet("1998-01-01");
 
@@ -199,8 +200,8 @@ public:
 
 	if  ( ( tuple->L_SHIPDATE >= t1 ) &&
 	      ( tuple->L_SHIPDATE < t2 ) &&
-	      ( tuple->L_DISCOUNT >= (DISCOUNT - 0.01)) &&
-	      ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
+              //	      ( tuple->L_DISCOUNT >= (DISCOUNT - 0.01)) &&
+	      // ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
 	      ( tuple->L_QUANTITY < (QUANTITY)) )
 	    {
 		//printf("+");
@@ -273,7 +274,9 @@ public:
     }
 
     bool eof(tuple_t &dest) {
-	*(double*)dest.data = sum;
+        double *output = (double*)dest.data;
+        output[0] = sum;
+        output[1] = count;
 	return true;
     }
 };
@@ -301,7 +304,7 @@ void *drive_stage(void *arg) {
  */
 
 int main() {
-
+    trace_current_setting = TRACE_ALWAYS;
     thread_init();
 
     // creates a TSCAN stage
@@ -379,45 +382,49 @@ int main() {
     }
     
 
+    for(int i=0; i < 10; i++) {
+        stopwatch_t timer;
+        
+        // TSCAN PACKET
+        // the output consists of 2 doubles
+        tuple_buffer_t tscan_out_buffer(2*sizeof(double));
+        tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
 
-    // TSCAN PACKET
-    // the output consists of 2 doubles
-    tuple_buffer_t tscan_out_buffer(2*sizeof(double));
-    tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
 
+        tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
+                                                             &tscan_out_buffer,
+                                                             tscan_filter,
+                                                             NULL, /* no need for client_buffer */
+                                                             tpch_lineitem);
 
-    tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
-							 &tscan_out_buffer,
-							 tscan_filter,
-							 NULL, /* no need for client_buffer */
-							 tpch_lineitem);
-
-    // AGG PACKET CREATION
-    // the output consists of 2 int
-    tuple_buffer_t  agg_output_buffer(sizeof(double));
-    tuple_filter_t* agg_filter = new tuple_filter_t();
-    count_aggregate_t*  q6_aggregator = new count_aggregate_t();
+        // AGG PACKET CREATION
+        // the output consists of 2 int
+        tuple_buffer_t  agg_output_buffer(2*sizeof(double));
+        tuple_filter_t* agg_filter = new tuple_filter_t(agg_output_buffer.tuple_size);
+        count_aggregate_t*  q6_aggregator = new count_aggregate_t();
     
-    aggregate_packet_t* q6_agg_packet = new aggregate_packet_t("test aggregate",
-							       &agg_output_buffer,
-							       agg_filter,
-							       &tscan_out_buffer,
-							       q6_aggregator);
+        aggregate_packet_t* q6_agg_packet = new aggregate_packet_t("test aggregate",
+                                                                   &agg_output_buffer,
+                                                                   agg_filter,
+                                                                   &tscan_out_buffer,
+                                                                   q6_aggregator);
 
 
-    // Dispatch packet
-    dispatcher_t::dispatch_packet(q6_tscan_packet);
-    dispatcher_t::dispatch_packet(q6_agg_packet);
+        // Dispatch packet
+        dispatcher_t::dispatch_packet(q6_tscan_packet);
+        dispatcher_t::dispatch_packet(q6_agg_packet);
     
-    tuple_t output;
-    agg_output_buffer.init_buffer();
+        tuple_t output;
+        agg_output_buffer.init_buffer();
 
-    int * r = NULL;
-    while(agg_output_buffer.get_tuple(output)) {
-	r = (int*)output.data;
-	TRACE(TRACE_ALWAYS, "*** Q6 Count: %d. Sum: %d.  ***\n", r[0], r[1]);
+        double * r = NULL;
+        while(agg_output_buffer.get_tuple(output)) {
+            r = (double*)output.data;
+            TRACE(TRACE_ALWAYS, "*** Q6 Count: %lf. Sum: %lf.  ***\n", r[0], r[1]);
+        }
+        
+        printf("Query executed in %lf ms\n", timer.time_ms());
     }
-
     try {    
 	// closes file and environment
 	TRACE(TRACE_DEBUG, "Closing Storage Manager...\n");
