@@ -266,7 +266,7 @@ void sort_stage_t::start_new_merges() {
         // If there are things happening below us, wait for them to
         // finish. We really want to merge with the result of every
         // merge below before shipping work to higher levels of merge
-        // hierarchy
+        // hierarchy.
 	if (lowest_merge_level <= level)
 	    continue;
 	
@@ -274,10 +274,16 @@ void sort_stage_t::start_new_merges() {
 	// after this point, we know lowest_merge_level and
 	// next_run_level > level
         int next_size, next_level;
-        if(lowest_merge_level > next_run_level) {
+	if (next_run_level < 0) {
+	    // No runs above us, but there are merges taking place!
+	    // Move up to the output level of the lowest merge.
+	    next_level = lowest_merge_level;
+	    next_size  = merges->second.size();
+	}
+        else if(lowest_merge_level > next_run_level) {
             // only runs at the next level
             next_level = next_run_level;
-            next_size  = (next_level == -1) ? 0 : next_level_it->second.size();
+            next_size  = next_level_it->second.size();
         }
         else if(lowest_merge_level < next_run_level) {
             // only merges at the next level
@@ -286,9 +292,9 @@ void sort_stage_t::start_new_merges() {
         }
         else {
             // both runs and merges at the next level
-            next_size = merges->second.size() + next_level_it->second.size();
             next_level = lowest_merge_level;
-        }
+            next_size = merges->second.size() + next_level_it->second.size(); 
+	}
 
 
 	TRACE(TRACE_DEBUG, "next_size = %d ; next_level = %d\n",
