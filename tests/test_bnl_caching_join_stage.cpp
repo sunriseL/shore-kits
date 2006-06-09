@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
     bnl_caching_join_packet_t* packet = 
 	new bnl_caching_join_packet_t("BNL_CACHING_JOIN_PACKET",
 				      &signal_buffer,
-				      new tuple_filter_t(),
+				      new tuple_filter_t(signal_buffer.tuple_size),
 				      NULL, // tuple_join_t!
 				      &signal_buffer,
 				      &writer_left_buffer,

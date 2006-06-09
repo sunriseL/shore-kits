@@ -154,7 +154,7 @@ private:
 public:
 
     /* Initialize the predicates */
-    q6_tscan_filter_t() : tuple_filter_t() {
+    q6_tscan_filter_t() : tuple_filter_t(sizeof(tpch_lineitem_tuple)) {
 	t1 = datestr_to_timet("1997-01-01");
 	t2 = datestr_to_timet("1998-01-01");
 

@@ -34,14 +34,46 @@ public:
 
 
     struct adaptor_t {
-
+    private:
+        page_guard_t _page;
+    public:
+        
 	virtual const char* get_container_name()=0;
         virtual packet_t* get_packet()=0;
-        virtual result_t output(const tuple_t &tuple)=0;
+        virtual result_t output(tuple_page_t *page)=0;
 
 	virtual void stop_accepting_packets()=0;	
 
         virtual bool check_for_cancellation()=0;
+        
+        /**
+         *  @brief Write a tuple to each waiting output buffer in a
+         *  chain of packets.
+         *
+         *  @return OUTPUT_RETURN_CONTINUE to indicate that we should continue
+         *  processing the query. OUTPUT_RETURN_STOP if all packets have been
+         *  serviced, sent EOFs, and deleted. OUTPUT_RETURN_ERROR on
+         *  unrecoverable error. process() should probably propagate this
+         *  error up.
+         */
+        result_t output(const tuple_t &tuple) {
+            assert(!_page->full());
+            _page->append_init(tuple);
+            if(_page->full()) {
+                result_t result = output(_page);
+                _page->clear();
+                return result;
+            }
+    
+            return stage_t::RESULT_CONTINUE;
+        }
+        adaptor_t(tuple_page_t *page)
+            : _page(page)
+        {
+            assert(_page);
+        }
+        
+        virtual ~adaptor_t() { }
     };
 
 

@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
    
     // the output is always a single int
     tuple_buffer_t  output_buffer(sizeof(int));
-    tuple_filter_t* filter = new tuple_filter_t();
+    tuple_filter_t* filter = new tuple_filter_t(input_buffer.tuple_size);
     int_tuple_comparator_t *compare = new int_tuple_comparator_t;
 
     sort_packet_t* packet = new sort_packet_t("test sort",

@@ -61,7 +61,7 @@ public:
 		   const char*     filename,
                    notify_t *notifier=NULL)
 	: packet_t(packet_id, PACKET_TYPE, output_buffer,
-                   new tuple_filter_t(), client_buffer),
+                   new tuple_filter_t(input_buffer->tuple_size), client_buffer),
 	  _input_buffer(input_buffer), _notifier(notifier)
     {
 	if ( asprintf(&_filename, "%s", filename) == -1 ) {

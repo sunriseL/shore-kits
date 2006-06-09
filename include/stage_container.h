@@ -38,6 +38,8 @@ protected:
         packet_list_t* _packet_list;
 	int _next_tuple;
         bool _still_accepting_packets;
+
+        page_guard_t out_page;
 	
 	// Checked independently of other variables. Don't need to
 	// protect this with _stage_adaptor_mutex.
@@ -48,8 +50,10 @@ protected:
     public:
 
         stage_adaptor_t(stage_container_t* container,
-                        packet_list_t* packet_list)
-            : _container(container),
+                        packet_list_t* packet_list,
+                        size_t tuple_size)
+            : adaptor_t(tuple_page_t::alloc(tuple_size, malloc)),
+              _container(container),
 	      _packet_list(packet_list),
 	      _next_tuple(1),
 	      _still_accepting_packets(true),
@@ -80,7 +84,9 @@ protected:
             return _packet;
         }
 
-        virtual stage_t::result_t output(const tuple_t &tuple);
+        virtual stage_t::result_t output(tuple_page_t *page) {
+            return output_page(page);
+        }
 	
 	virtual void stop_accepting_packets() {
 	    critical_section_t cs(&_stage_adaptor_lock);
@@ -100,6 +106,8 @@ protected:
 	void terminate_packet(packet_t* packet, int stage_done);
 
         void abort_queries();
+    private:
+        stage_t::result_t output_page(tuple_page_t *page);
     };
     
   

@@ -121,7 +121,7 @@ int main() {
 
     // fire up the merge stage now
     tuple_buffer_t  output_buffer(sizeof(int));
-    tuple_filter_t* filter = new tuple_filter_t();
+    tuple_filter_t* filter = new tuple_filter_t(input_buffers[0]->tuple_size);
     int_tuple_comparator_t comparator;
 
     merge_packet_t* packet = new merge_packet_t("test merge",

@@ -119,20 +119,10 @@ packet_list_t* stage_container_t::container_queue_dequeue() {
     return plist;
 }
 
-
-
 /**
- *  @brief Write a tuple to each waiting output buffer in a chain of
- *  packets.
- *
- *  @return OUTPUT_RETURN_CONTINUE to indicate that we should continue
- *  processing the query. OUTPUT_RETURN_STOP if all packets have been
- *  serviced, sent EOFs, and deleted. OUTPUT_RETURN_ERROR on
- *  unrecoverable error. process() should probably propagate this
- *  error up.
+ * @brief Outputs a page of tuples. The caller retains ownership of the page.
  */
-stage_t::result_t stage_container_t::stage_adaptor_t::output(const tuple_t &tuple) {
-
+stage_t::result_t stage_container_t::stage_adaptor_t::output_page(tuple_page_t *page) {
     packet_list_t::iterator it, end;
     unsigned int next_tuple;
     
@@ -140,47 +130,56 @@ stage_t::result_t stage_container_t::stage_adaptor_t::output(const tuple_t &tupl
     critical_section_t cs(&_stage_adaptor_lock);
     it  = _packet_list->begin();
     end = _packet_list->end();
-    next_tuple = ++_next_tuple;
+    _next_tuple += page->tuple_count();
+    next_tuple = _next_tuple;
     cs.exit();
 
     
-    // Any new packets which merge after this point will not be
-    // receiving "tuple" this iteration.
-
+    // Any new packets which merge after this point will not 
+    // receive this page.
+    
 
     bool packets_remaining = false;
     tuple_t out_tup;
 
-
     while (it != end) {
 	
-        packet_t* packet = *it;	
-	
-        // was this tuple selected?
-        if(packet->filter->select(tuple)) {
-	    if ( packet->output_buffer->alloc_tuple(out_tup) ) {
-		// alloc_tuple() failed!
-		it = _packet_list->erase(it);
-		terminate_packet(packet, 0);
-		continue;
-	    }
+        packet_t* packet = *it;
+        bool terminate = false;
 
-	    // send tuple
-	    packet->filter->project(out_tup, tuple);
-	}
+        // drain this page into the packet's output buffer
+        tuple_page_t::iterator page_it = page->begin();
+        for( ; page_it != page->end(); ++page_it) {
+            
+            // was this tuple selected?
+            if(packet->filter->select(*page_it)) {
+                if ( packet->output_buffer->alloc_tuple(out_tup) ) {
+                    // alloc_tuple() failed!
+                    terminate = true;
+                    break;
+                }
 
-	// check for completed packets
-	if ( next_tuple == packet->_stage_next_tuple_needed ) {
-	    // this packet has received all data it needs!
-	    it = _packet_list->erase(it);
-	    terminate_packet(packet, 0);
-	    continue;
-	}
+                // send tuple
+                packet->filter->project(out_tup, *page_it);
+            }
+        }
 
+
+        // check for completed packets
+        if ( next_tuple == packet->_stage_next_tuple_needed ) {
+            // this packet has received all data it needs!
+            terminate = true;
+        }
+        
 	// continue to next merged packet
-	++it;
+        if(terminate) {
+            terminate_packet(packet, 0);
+            it = _packet_list->erase(it);
+        }
+        else
+            ++it;
+        
 	packets_remaining = true;
-	continue;
     }
     
     
@@ -438,7 +437,8 @@ void stage_container_t::run() {
 
     
  	pointer_guard_t <stage_t> stage = _stage_maker->create_stage();
-	stage_adaptor_t(this, packets).run_stage(stage);
+        size_t tuple_size = packets->front()->filter->input_tuple_size();
+	stage_adaptor_t(this, packets, tuple_size).run_stage(stage);
 	
 
 	// TODO: check for container shutdown

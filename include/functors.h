@@ -15,10 +15,13 @@
  */
 
 class tuple_filter_t {
-
+private:
+    size_t _tuple_size;
+    
 public:
 
-
+    size_t input_tuple_size() { return _tuple_size; }
+    
     /**
      *  @brief Determine which attributes (if any) of a given source
      *  tuple pass an internal set of predicates. Should be applied to
@@ -59,6 +62,11 @@ public:
         dest.assign(src);
     }
 
+
+    tuple_filter_t(size_t input_tuple_size)
+        : _tuple_size(input_tuple_size)
+    {
+    }
     
     virtual ~tuple_filter_t() { }
 

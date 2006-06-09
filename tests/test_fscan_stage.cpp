@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
     // aggregate single count result (single int)
     tuple_buffer_t int_buffer(sizeof(int));
     fscan_packet_t* packet = 
-	new fscan_packet_t("FSCAN_PACKET", &int_buffer, new tuple_filter_t(), &int_buffer, input_filename);
+	new fscan_packet_t("FSCAN_PACKET", &int_buffer, new tuple_filter_t(int_buffer.tuple_size), &int_buffer, input_filename);
     
     
     dispatcher_t::dispatch_packet(packet);

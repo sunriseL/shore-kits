@@ -120,7 +120,7 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
         tuple_buffer_t* buf = new tuple_buffer_t(_tuple_size);
         p = new fscan_packet_t("sort-fscan",
 			       buf,
-                               new tuple_filter_t(),
+                               new tuple_filter_t(_tuple_size),
                                _adaptor->get_packet()->client_buffer,
                                run_filename.c_str());
         dispatcher_t::dispatch_packet(p);
@@ -137,7 +137,7 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
                             merge_out,
                             _adaptor->get_packet()->client_buffer,
                             fscan_buffers,
-                            new tuple_filter_t(),
+                            new tuple_filter_t(_tuple_size),
                             merge_factor,
                             _comparator);
     dispatcher_t::dispatch_packet(mp);
