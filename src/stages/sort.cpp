@@ -253,6 +253,7 @@ void sort_stage_t::start_new_merges() {
         merge_map_t::iterator merges = _merge_map.begin();
         int lowest_merge_level = (merges == _merge_map.end())? -1 : merges->first;
 
+
 	TRACE(TRACE_DEBUG, "lowest_merge_level = %d ; next_run_level = %d\n",
 	      lowest_merge_level,
 	      next_run_level);
@@ -260,22 +261,28 @@ void sort_stage_t::start_new_merges() {
 	
         // We reduce system I/O when we merge small files together
         // before moving them up the merge hierarchy.
-        int next_size;
-        int next_level;
+
+
+        // If there are things happening below us, wait for them to
+        // finish. We really want to merge with the result of every
+        // merge below before shipping work to higher levels of merge
+        // hierarchy
+	if (lowest_merge_level <= level)
+	    continue;
+	
+
+	// after this point, we know lowest_merge_level and
+	// next_run_level > level
+        int next_size, next_level;
         if(lowest_merge_level > next_run_level) {
-            // no merges below and only runs at the next level
-            next_size  = next_level_it->second.size();
+            // only runs at the next level
             next_level = next_run_level;
+            next_size  = (next_level == -1) ? 0 : next_level_it->second.size();
         }
         else if(lowest_merge_level < next_run_level) {
             // only merges at the next level
-            next_size = merges->second.size();
             next_level = lowest_merge_level;
-        }
-        else if(lowest_merge_level < 0) {
-            // nothing above us -- last merge!
-            next_size = 0;
-            next_level = -1;
+            next_size  = merges->second.size();
         }
         else {
             // both runs and merges at the next level
@@ -283,15 +290,11 @@ void sort_stage_t::start_new_merges() {
             next_level = lowest_merge_level;
         }
 
+
 	TRACE(TRACE_DEBUG, "next_size = %d ; next_level = %d\n",
 	      next_size,
 	      next_level);
 
-        // If there are things happening below us, wait for them to
-        // finish. We really want to merge with every run/merge below
-        // before shipping work to higher levels of merge hierarchy
-        if(next_level <= level)
-            continue;
                 
         // promote or partial merge?
         int required_merges = (next_size + MERGE_FACTOR-1)/MERGE_FACTOR;
