@@ -233,19 +233,6 @@ void sort_stage_t::start_new_merges() {
 	    (next_level_it == _run_map.end()) ? -1 : next_level_it->first;
 
 	
-	// If these are the last runs in the system, issue one final
-	// merge request.
-	if ( _merge_map.empty() && (next_run_level < 0) ) {
-	    // No merges taking place below us and no runs above
-	    // us. Submit one final merge request. start_merge()
-	    // should redirect output to the SORT worker thread and
-	    // optimize for the single-merge case.
-	    start_merge(-1, runs, runs.size());
-	    _run_map.erase(curr_level_it);
-	    continue;
-	}
-
-
         // Try to find in-progress merges at or below this
         // level. 'lowest_merge_level' is set to -1 if no merges are
         // found. Otherwise, it is set to the lowest level where a
@@ -263,18 +250,24 @@ void sort_stage_t::start_new_merges() {
         // before moving them up the merge hierarchy.
 
 
-        // If there are things happening below us, wait for them to
-        // finish. We really want to merge with the result of every
-        // merge below before shipping work to higher levels of merge
-        // hierarchy.
-	if (lowest_merge_level <= level)
-	    continue;
-	
-
-	// after this point, we know lowest_merge_level and
-	// next_run_level > level
         int next_size, next_level;
-	if (next_run_level < 0) {
+	if ((lowest_merge_level >= 0) && (lowest_merge_level <= level)) {
+	    // There are merges happening below us. Wait for them to
+	    // finish. We really want to merge with the result of
+	    // every merge below before shipping work to higher levels
+	    // of merge hierarchy.
+	    continue;
+	}
+	else if ((lowest_merge_level < 0) && (next_run_level < 0)) {
+	    // No merges taking place in the system and no runs above
+	    // us. Submit one final merge request. start_merge()
+	    // should redirect output to the SORT worker thread and
+	    // optimize for the single-merge case.
+	    start_merge(-1, runs, runs.size());
+	    _run_map.erase(curr_level_it);
+	    continue;
+	}
+	else if (next_run_level < 0) {
 	    // No runs above us, but there are merges taking place!
 	    // Move up to the output level of the lowest merge.
 	    next_level = lowest_merge_level;
