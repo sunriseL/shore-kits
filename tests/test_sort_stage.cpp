@@ -85,6 +85,8 @@ struct int_tuple_comparator_t : public tuple_comparator_t {
 int main(int argc, char* argv[]) {
 
     thread_init();
+    int THREAD_POOL_SIZE = 20;
+
     
 
     // usage: test_sort_stage <values> [off]
@@ -105,34 +107,42 @@ int main(int argc, char* argv[]) {
 
     sc = new stage_container_t("FDUMP_CONTAINER", new stage_factory<fdump_stage_t>);
     dispatcher_t::register_stage_container(fdump_packet_t::PACKET_TYPE, sc);
-    tester_thread_t* fdump_thread = new tester_thread_t(drive_stage, sc, "FDUMP THREAD");
-    if ( thread_create( NULL, fdump_thread ) ) {
-        TRACE(TRACE_ALWAYS, "thread_create failed\n");
-        QPIPE_PANIC();
+    for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+	tester_thread_t* fdump_thread = new tester_thread_t(drive_stage, sc, "FDUMP THREAD");
+	if ( thread_create( NULL, fdump_thread ) ) {
+	    TRACE(TRACE_ALWAYS, "thread_create failed\n");
+	    QPIPE_PANIC();
+	}
     }
     
     sc = new stage_container_t("FSCAN_CONTAINER", new stage_factory<fscan_stage_t>);
     dispatcher_t::register_stage_container(fscan_packet_t::PACKET_TYPE, sc);
-    tester_thread_t* fscan_thread = new tester_thread_t(drive_stage, sc, "FSCAN THREAD");
-    if ( thread_create( NULL, fscan_thread ) ) {
-        TRACE(TRACE_ALWAYS, "thread_create failed\n");
-        QPIPE_PANIC();
+    for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+	tester_thread_t* fscan_thread = new tester_thread_t(drive_stage, sc, "FSCAN THREAD");
+	if ( thread_create( NULL, fscan_thread ) ) {
+	    TRACE(TRACE_ALWAYS, "thread_create failed\n");
+	    QPIPE_PANIC();
+	}
     }
     
     sc = new stage_container_t("MERGE_CONTAINER", new stage_factory<merge_stage_t>);
     dispatcher_t::register_stage_container(merge_packet_t::PACKET_TYPE, sc);
-    tester_thread_t* merge_thread = new tester_thread_t(drive_stage, sc, "MERGE THREAD");
-    if ( thread_create( NULL, merge_thread ) ) {
-        TRACE(TRACE_ALWAYS, "thread_create failed\n");
-        QPIPE_PANIC();
+    for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+	tester_thread_t* merge_thread = new tester_thread_t(drive_stage, sc, "MERGE THREAD");
+	if ( thread_create( NULL, merge_thread ) ) {
+	    TRACE(TRACE_ALWAYS, "thread_create failed\n");
+	    QPIPE_PANIC();
+	}
     }
 
     sc = new stage_container_t("SORT_CONTAINER", new stage_factory<sort_stage_t>);
     dispatcher_t::register_stage_container(sort_packet_t::PACKET_TYPE, sc);
-    tester_thread_t* sort_thread = new tester_thread_t(drive_stage, sc, "SORT THREAD");
-    if ( thread_create( NULL, sort_thread ) ) {
-        TRACE(TRACE_ALWAYS, "thread_create failed\n");
-        QPIPE_PANIC();
+    for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+	tester_thread_t* sort_thread = new tester_thread_t(drive_stage, sc, "SORT THREAD");
+	if ( thread_create( NULL, sort_thread ) ) {
+	    TRACE(TRACE_ALWAYS, "thread_create failed\n");
+	    QPIPE_PANIC();
+	}
     }
 
 
