@@ -338,6 +338,13 @@ void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
     int process_ret = stage->process();
     stop_accepting_packets();
 
+    // flush any partial page
+    if(process_ret == stage_t::RESULT_STOP) {
+        process_ret = flush();
+        if(process_ret == stage_t::RESULT_CONTINUE)
+            process_ret = stage_t::RESULT_STOP;
+    }
+    
     switch(process_ret) {
     case stage_t::RESULT_STOP:
         break;

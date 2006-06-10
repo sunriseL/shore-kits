@@ -81,13 +81,12 @@ struct tpch_lineitem_tuple {
 
 // the tuples after tablescan projection
 struct projected_lineitem_tuple {
+    char L_RETURNFLAG;
+    char L_LINESTATUS;
     double L_QUANTITY;
     double L_EXTENDEDPRICE;
     double L_DISCOUNT;
     double L_TAX;
-    time_t L_SHIPDATE;
-    char L_RETURNFLAG;
-    char L_LINESTATUS;
 };
 
 // the final aggregated tuples
@@ -197,12 +196,13 @@ public:
 
 	tpch_lineitem_tuple *tuple = (tpch_lineitem_tuple*)input.data;
 
-	if  ( tuple->L_SHIPDATE <= t ) {
-	    //printf("+");
+        // FIXME: reversed on purpose to reduce selectivity...
+	if  ( tuple->L_SHIPDATE >= t ) {
+            //	    printf("+");
 	    return (true);
 	}
 	else {
-	    //printf(".");
+            //	    printf(".");
 	    return (false);
 	}
     }
@@ -221,7 +221,6 @@ public:
         dest->L_EXTENDEDPRICE = src->L_EXTENDEDPRICE;
         dest->L_DISCOUNT = src->L_DISCOUNT;
         dest->L_TAX = src->L_TAX;
-        dest->L_SHIPDATE = src->L_SHIPDATE;
     }
 };
 
@@ -277,6 +276,8 @@ public:
         broken |= (tuple.L_LINESTATUS != src->L_LINESTATUS);
         if(broken)
             valid = break_group(d, src->L_RETURNFLAG, src->L_LINESTATUS);
+        //        else
+        //            printf(".");
 
         // cache resused values for convenience
         double L_EXTENDEDPRICE = src->L_EXTENDEDPRICE;
@@ -313,6 +314,7 @@ public:
     bool break_group(tuple_t &d, char L_RETURNFLAG, char L_LINESTATUS) {
         bool valid = !first;
         first = false;
+        printf("+\n");
         // output?
         if(valid) {
             aggregate_tuple *dest;
@@ -328,9 +330,9 @@ public:
         }
             
         // reset the aggregate values
+        memset(&tuple, 0, sizeof(aggregate_tuple));
         tuple.L_RETURNFLAG = L_RETURNFLAG;
         tuple.L_LINESTATUS = L_LINESTATUS;
-        memset(&tuple.L_SUM_QTY, 0, 8*sizeof(double));
         return valid;
     }
 };
@@ -477,7 +479,7 @@ int main() {
     }
     
 
-    for(int i=0; i < 10; i++) {
+    for(int i=0; i < 1; i++) {
         stopwatch_t timer;
         
         // TSCAN PACKET
@@ -522,14 +524,15 @@ int main() {
         tuple_t output;
         agg_output_buffer.init_buffer();
 
-        double * r = NULL;
-	
 	TRACE(TRACE_ALWAYS, "*** Q1 ANSWER ...\n");
 	TRACE(TRACE_ALWAYS, "*** SUM_QTY\tSUM_BASE\tSUM_DISC...\n");
 
         while(agg_output_buffer.get_tuple(output)) {
-            r = (double*)(output.data + 2*sizeof(char));
-            TRACE(TRACE_ALWAYS, "*** %lf\t%lf\t*\n", r[0], r[1], r[2]);
+            aggregate_tuple *tuple;
+            tuple = (aggregate_tuple *) output.data;
+            TRACE(TRACE_ALWAYS, "*** %lf\t%lf\t%lf\n",
+                  tuple->L_SUM_QTY, tuple->L_SUM_BASE_PRICE,
+                  tuple->L_SUM_DISC_PRICE);
         }
         
         printf("Query executed in %lf ms\n", timer.time_ms());

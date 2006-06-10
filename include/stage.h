@@ -67,6 +67,7 @@ public:
     
             return stage_t::RESULT_CONTINUE;
         }
+        
         adaptor_t(tuple_page_t *page)
             : _page(page)
         {
@@ -74,6 +75,21 @@ public:
         }
         
         virtual ~adaptor_t() { }
+        
+    protected:
+        /**
+         * @brief outputs the last partial page, if any. The adaptor's
+         * implementation should call this function after normal
+         * processing has completed (stage implementations need not
+         * concern themselves with this).
+         */
+        result_t flush() {
+            if(_page->empty())
+                return RESULT_STOP;
+
+            return output(_page);
+        }
+        
     };
 
 
