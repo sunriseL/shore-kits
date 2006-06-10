@@ -2,11 +2,10 @@
 
 /** @file    : test_q6.cpp
  *  @brief   : Unittest for Q6
- *  @author  : Ippokratis Pandis
  *  @version : 0.1
  *  @history :
- 8/6/2006 : Updated to work with the new class definitions
- 25/5/2006: Initial version
+ 6/8/2006 : Updated to work with the new class definitions
+ 5/25/2006: Initial version
 */ 
 
 #include "thread.h"
@@ -232,7 +231,7 @@ public:
 	// Calculate L_EXTENDEDPRICE
 	tpch_lineitem_tuple *at = (tpch_lineitem_tuple*)(src.data);
 
-	memcpy(dest.data,& at->L_EXTENDEDPRICE, sizeof(double));
+	memcpy(dest.data, &at->L_EXTENDEDPRICE, sizeof(double));
 	memcpy(dest.data + sizeof(double), &at->L_DISCOUNT, sizeof(double));
     }
 

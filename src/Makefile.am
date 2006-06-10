@@ -1,7 +1,7 @@
 # -*- makefile -*-
 
 
-INCLUDES = -I$(top_srcdir)/include
+INCLUDES = -I$(top_srcdir)/include -I$(top_srcdir)/include/util
 
 
 
@@ -31,7 +31,9 @@ DISPATCHER = \
 
 UTIL = \
    util/static_hash_map.cpp \
-   util/hash_functions.cpp
+   util/hash_functions.cpp \
+   util/time_util.cpp
+
 
 
 
