@@ -190,7 +190,7 @@ void sort_stage_t::start_new_merges() {
     while(level_it != _run_map.end()) {
 
         int level = level_it->first;
-	TRACE(TRACE_ALWAYS, "Running on level %d\n", level);
+	TRACE(TRACE_DEBUG, "Running on level %d\n", level);
 
         
         run_list_t &runs = level_it->second;
@@ -273,6 +273,11 @@ void sort_stage_t::start_new_merges() {
 	    next_level = lowest_merge_level;
 	    next_size  = merges->second.size();
 	}
+        else if (lowest_merge_level < 0) {
+            // No merges taking place, but there are runs above us
+            next_level = next_run_level;
+            next_size  = next_level_it->second.size();
+        }
         else if(lowest_merge_level > next_run_level) {
             // only runs at the next level
             next_level = next_run_level;

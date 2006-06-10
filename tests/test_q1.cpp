@@ -79,6 +79,30 @@ struct tpch_lineitem_tuple {
     // char L_COMMENT[44];
 };
 
+// the tuples after tablescan projection
+struct projected_lineitem_tuple {
+    double L_QUANTITY;
+    double L_EXTENDEDPRICE;
+    double L_DISCOUNT;
+    double L_TAX;
+    time_t L_SHIPDATE;
+    char L_RETURNFLAG;
+    char L_LINESTATUS;
+};
+
+// the final aggregated tuples
+struct aggregate_tuple {
+    char L_RETURNFLAG;
+    char L_LINESTATUS;
+    double L_SUM_QTY;
+    double L_SUM_BASE_PRICE;
+    double L_SUM_DISC_PRICE;
+    double L_SUM_CHARGE;
+    double L_AVG_QTY;
+    double L_AVG_PRICE;
+    double L_AVG_DISC;
+    double L_COUNT_ORDER;
+};
 
 int tpch_lineitem_bt_compare_fcn(Db*, const Dbt* k1, const Dbt* k2) {
     // LINEITEM key has 3 integers
@@ -173,7 +197,7 @@ public:
 
 	tpch_lineitem_tuple *tuple = (tpch_lineitem_tuple*)input.data;
 
-	if  ( tuple->L_SHIPDATE >= t ) {
+	if  ( tuple->L_SHIPDATE <= t ) {
 	    //printf("+");
 	    return (true);
 	}
@@ -184,36 +208,20 @@ public:
     }
     
     /* Projection */
-    virtual void project(tuple_t &dest, const tuple_t &src) {
+    virtual void project(tuple_t &d, const tuple_t &s) {
 
-	/* Should project L_EXTENDEDPRICE & L_DISCOUNT */
+        projected_lineitem_tuple *dest;
+        tpch_lineitem_tuple *src;
+        dest = (projected_lineitem_tuple *) d.data;
+        src = (tpch_lineitem_tuple *) s.data;
 
-	// Calculate L_EXTENDEDPRICE
-	tpch_lineitem_tuple *at = (tpch_lineitem_tuple*)(src.data);
-
-	// PADDING
-	int dest_offset = 0;
-	memcpy(dest.data + dest_offset, &at->L_RETURNFLAG, sizeof(char));
-
-	dest_offset += sizeof(char);
-	memcpy(dest.data + dest_offset, &at->L_LINESTATUS, sizeof(char));
-
-	int pad_offset = sizeof(int) - 2*sizeof(char);
-	char padding[pad_offset];
-	dest_offset += pad_offset;
-	memcpy(dest.data + dest_offset, &padding, pad_offset);
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &at->L_QUANTITY, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &at->L_EXTENDEDPRICE, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &at->L_DISCOUNT, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &at->L_TAX, sizeof(double));       
+        dest->L_RETURNFLAG = src->L_RETURNFLAG;
+        dest->L_LINESTATUS = src->L_LINESTATUS;
+        dest->L_QUANTITY = src->L_QUANTITY;
+        dest->L_EXTENDEDPRICE = src->L_EXTENDEDPRICE;
+        dest->L_DISCOUNT = src->L_DISCOUNT;
+        dest->L_TAX = src->L_TAX;
+        dest->L_SHIPDATE = src->L_SHIPDATE;
     }
 };
 
@@ -223,12 +231,18 @@ public:
 
 // Q1 SORT
 
-struct int_tuple_comparator_t : public tuple_comparator_t {
-    virtual int compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b) {
-        return a.key - b.key;
+// "order by L_RETURNFLAG, L_LINESTATUS"
+struct q1_tuple_comparator_t : public tuple_comparator_t {
+    virtual int compare(const key_tuple_pair_t &ta, const key_tuple_pair_t &tb) {
+        // this is all it takes since both are chars (2 < sizeof(int))
+        return ta.key - tb.key;
     }
     virtual int make_key(const tuple_t &tuple) {
-        return *(int*)tuple.data;
+        // store the return flag and line status in the 
+        projected_lineitem_tuple *item;
+        item = (projected_lineitem_tuple *) tuple.data;
+        int key = (item->L_RETURNFLAG << 8) | item->L_LINESTATUS;
+        return key;
     }
 };
 
@@ -241,96 +255,83 @@ class count_aggregate_t : public tuple_aggregate_t {
 
 private:
     // STATS
-    char L_RETURNFLAG;
-    char L_LINESTATUS;
-    double SUM_QTY;
-    double SUM_BASE_PRICE;
-    double SUM_DISC_PRICE;
-    double SUM_CHARGE;
-    double SUM_EXT_PRICE;
-    double SUM_DISCOUNT;
-    int COUNT_ORDER;
-
-    double * src_QTY;
-    double * src_EXT_PRICE;
-    double * src_DISCOUNT;
-    double * src_TAX;
+    bool first;
+    aggregate_tuple tuple;
 
 public:
   
     count_aggregate_t() {
-	SUM_QTY = 0.0;
-	SUM_BASE_PRICE = 0.0;
-	SUM_DISC_PRICE = 0.0;
-	SUM_CHARGE = 0.0;
-	SUM_EXT_PRICE = 0.0;
-	SUM_DISCOUNT = 0.0;
-	COUNT_ORDER = 0;
+        first = true;
+        tuple.L_RETURNFLAG = -1;
+        tuple.L_LINESTATUS = -1;
     }
   
-    bool aggregate(tuple_t &, const tuple_t & src) {
+    bool aggregate(tuple_t &d, const tuple_t &s) {
+        projected_lineitem_tuple *src;
+        src = (projected_lineitem_tuple *)s.data;
 
-	// read tuple
-	src_QTY = (double *)(src.data + sizeof(int));
-	src_EXT_PRICE = (double *)(src.data + sizeof(int) + sizeof(double));
-	src_DISCOUNT = (double *)(src.data + sizeof(int) + 2*sizeof(double));
-	src_TAX = (double *)(src.data + sizeof(int) + 3*sizeof(double));
+        // break group?
+        bool broken = false;
+        bool valid = false;
+        broken |= (tuple.L_RETURNFLAG != src->L_RETURNFLAG);
+        broken |= (tuple.L_LINESTATUS != src->L_LINESTATUS);
+        if(broken)
+            valid = break_group(d, src->L_RETURNFLAG, src->L_LINESTATUS);
 
-	// update STATS
-	COUNT_ORDER++;
+        // cache resused values for convenience
+        double L_EXTENDEDPRICE = src->L_EXTENDEDPRICE;
+        double L_DISCOUNT = src->L_DISCOUNT;
+        double L_QUANTITY = src->L_QUANTITY;
+        double L_DISC_PRICE = L_EXTENDEDPRICE * (1 - L_DISCOUNT);
 
-	SUM_QTY += *src_QTY;
-	SUM_BASE_PRICE += *src_EXT_PRICE;
-	SUM_DISC_PRICE += *src_EXT_PRICE * (1 - *src_DISCOUNT);
-	SUM_CHARGE += *src_EXT_PRICE * (1 - *src_DISCOUNT) * (1 + *src_TAX);
-	SUM_EXT_PRICE += *src_EXT_PRICE;
-	SUM_DISCOUNT += *src_DISCOUNT;
-    
-	if (COUNT_ORDER % 100 == 0) {
-	    TRACE(TRACE_DEBUG, "%d\n", COUNT_ORDER);
+        // update count
+        tuple.L_COUNT_ORDER++;
+        
+        // update sums
+        tuple.L_SUM_QTY += L_QUANTITY;
+        tuple.L_SUM_BASE_PRICE += L_EXTENDEDPRICE;
+        tuple.L_SUM_DISC_PRICE += L_DISC_PRICE;
+        tuple.L_SUM_CHARGE += L_DISC_PRICE * (1 + src->L_TAX);
+        tuple.L_AVG_QTY += L_QUANTITY;
+        tuple.L_AVG_PRICE += L_EXTENDEDPRICE;
+        tuple.L_AVG_DISC += L_DISCOUNT;
+
+	if (((int) tuple.L_COUNT_ORDER) % 100 == 0) {
+	    TRACE(TRACE_DEBUG, "%lf\n", tuple.L_COUNT_ORDER);
 	    fflush(stdout);
 	}
 
-	return false;
+        // output valid?
+        return valid;
     }
 
     
-    bool eof(tuple_t &dest) {
-	
-	int dest_offset = 0;
-	memcpy(dest.data + dest_offset, &L_RETURNFLAG, sizeof(char));
+    bool eof(tuple_t &d) {
+        return break_group(d, -1, -1);
+    }
 
-	dest_offset += sizeof(char);
-	memcpy(dest.data + dest_offset, &L_LINESTATUS, sizeof(char));
+    bool break_group(tuple_t &d, char L_RETURNFLAG, char L_LINESTATUS) {
+        bool valid = !first;
+        first = false;
+        // output?
+        if(valid) {
+            aggregate_tuple *dest;
+            dest = (aggregate_tuple *)d.data;
+                
+            // compute averages
+            tuple.L_AVG_QTY /= tuple.L_COUNT_ORDER;
+            tuple.L_AVG_PRICE /= tuple.L_COUNT_ORDER;
+            tuple.L_AVG_DISC /= tuple.L_COUNT_ORDER;
 
-	dest_offset += sizeof(char);
-	memcpy(dest.data + dest_offset, &SUM_QTY, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &SUM_BASE_PRICE, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &SUM_DISC_PRICE, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &SUM_CHARGE, sizeof(double));
-
-	dest_offset += sizeof(double);
-	double AVG_QTY = SUM_QTY / COUNT_ORDER;
-	memcpy(dest.data + dest_offset, &AVG_QTY, sizeof(double));
-
-	dest_offset += sizeof(double);
-	double AVG_PRICE = SUM_EXT_PRICE / COUNT_ORDER;
-	memcpy(dest.data + dest_offset, &AVG_PRICE, sizeof(double));
-
-	dest_offset += sizeof(double);
-	double AVG_DISC = SUM_DISCOUNT / COUNT_ORDER;
-	memcpy(dest.data + dest_offset, &AVG_DISC, sizeof(double));
-
-	dest_offset += sizeof(double);
-	memcpy(dest.data + dest_offset, &COUNT_ORDER, sizeof(int));
-
-	return true;
+            // assign the value to the output
+            *dest = tuple;
+        }
+            
+        // reset the aggregate values
+        tuple.L_RETURNFLAG = L_RETURNFLAG;
+        tuple.L_LINESTATUS = L_LINESTATUS;
+        memset(&tuple.L_SUM_QTY, 0, 8*sizeof(double));
+        return valid;
     }
 };
 
@@ -481,7 +482,7 @@ int main() {
         
         // TSCAN PACKET
         // the output consists of 2 doubles
-	tuple_buffer_t tscan_out_buffer(sizeof(int) + 4 * sizeof(double));
+	tuple_buffer_t tscan_out_buffer(sizeof(projected_lineitem_tuple));
         tuple_filter_t *tscan_filter = new q1_tscan_filter_t();
         tscan_packet_t *q1_tscan_packet = new tscan_packet_t("q1 tscan",
                                                              &tscan_out_buffer,
@@ -491,9 +492,9 @@ int main() {
    
 	// SORT PACKET
 	// the output is always a single int
-	tuple_buffer_t sort_out_buffer(sizeof(int) + 4 * sizeof(double));
+	tuple_buffer_t sort_out_buffer(sizeof(projected_lineitem_tuple));
 	tuple_filter_t* sort_filter = new tuple_filter_t(tscan_out_buffer.tuple_size);
-	int_tuple_comparator_t *compare = new int_tuple_comparator_t;
+	tuple_comparator_t *compare = new q1_tuple_comparator_t;
 	sort_packet_t* q1_sort_packet = new sort_packet_t("q1 sort",
 							     &sort_out_buffer,
 							     &sort_out_buffer,
@@ -503,7 +504,7 @@ int main() {
 
         // AGG PACKET CREATION
         // the output consists of 2 int
-        tuple_buffer_t  agg_output_buffer(2*sizeof(double));
+        tuple_buffer_t  agg_output_buffer(sizeof(aggregate_tuple));
         tuple_filter_t* agg_filter = new tuple_filter_t(agg_output_buffer.tuple_size);
         count_aggregate_t*  q1_aggregator = new count_aggregate_t();
         aggregate_packet_t* q1_agg_packet = new aggregate_packet_t("q1 aggregate",

@@ -106,7 +106,7 @@ stage_t::result_t merge_stage_t::process_packet() {
     
     // allocate an array of buffer heads
     int merge_factor = inputs.size();
-    printf("merge factor = %d\n", merge_factor);
+    TRACE(TRACE_DEBUG, "merge factor = %d\n", merge_factor);
     buffer_head_t head_array[merge_factor];
                              
     // get the input buffers and perform the initial sort
