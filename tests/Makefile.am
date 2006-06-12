@@ -14,7 +14,8 @@ bin_PROGRAMS = \
    test_tscan_stage \
    test_sort_stage \
    test_q6 \
-   test_q1	
+   test_q1 \
+   lineitem_struct_sizes
 
 #\
 	       test_aggregate_stage
@@ -28,8 +29,8 @@ test_fscan_stage_SOURCES = test_fscan_stage.cpp
 test_bnl_caching_join_stage_SOURCES = test_bnl_caching_join_stage.cpp
 test_tscan_stage_SOURCES = test_tscan_stage.cpp
 
-test_scalar_aggregate_stage_SOURCES = test_scalar_aggregate_stage.cpp
 test_aggregate_stage_SOURCES = test_aggregate_stage.cpp
+lineitem_struct_sizes_SOURCES = lineitem_struct_sizes.cpp
 test_q6_SOURCES = test_q6.cpp
 test_q1_SOURCES = test_q1.cpp
 

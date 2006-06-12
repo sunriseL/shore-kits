@@ -102,12 +102,8 @@ stage_t::result_t tscan_stage_t::process_packet() {
         Dbt key, data;
         DbMultipleKeyDataIterator it = bulk_data;
 	for (int tuple_index = 0; it.next(key, data); tuple_index++) {
-
-	    //    TRACE(TRACE_DEBUG, "Reading tuple %d in bulk read %d\n",
-	    //  tuple_index,
-	    //  bulk_read_index);
-
-	    result_t output_ret = adaptor->output(data);
+            tuple_t tuple(data);
+	    result_t output_ret = adaptor->output(tuple);
             if(output_ret)
                 return output_ret;
         }

@@ -397,7 +397,7 @@ public:
     bool append_init(const tuple_t &tuple) {
 
 	// error checking
-	assert(tuple.size == tuple_size());
+        assert(tuple.size == tuple_size());
 
         char *data = allocate_tuple();
         if(!data)

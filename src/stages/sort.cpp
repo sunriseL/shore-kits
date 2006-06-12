@@ -545,7 +545,7 @@ int sort_stage_t::print_runs() {
     for( ; level_it != _run_map.end(); ++level_it) {
         int level = level_it->first;
         run_list_t &runs = level_it->second;
-        printf("Level %d (%d):\n", level, runs.size());
+        printf("Level %d (%zd):\n", level, runs.size());
         run_list_t::iterator it = runs.begin();
         for( ; it != runs.end(); ++it)
             printf("\t%s\n", it->c_str());
@@ -558,7 +558,7 @@ int sort_stage_t::print_merges() {
     for( ; level_it != _merge_map.end(); ++level_it) {
         int level = level_it->first;
         merge_list_t &merges = level_it->second;
-        printf("Level %d (%d)\n", level, merges.size());
+        printf("Level %d (%zd)\n", level, merges.size());
         merge_list_t::iterator it = merges.begin();
         for( ; it != merges.end(); ++it) {
             printf("\t%s <=\n", it->_output.c_str());
