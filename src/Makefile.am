@@ -32,6 +32,7 @@ DISPATCHER = \
 UTIL = \
    util/static_hash_map.cpp \
    util/hash_functions.cpp \
+   util/shuffle.cpp \
    util/time_util.cpp
 
 
