@@ -2,7 +2,7 @@
 
 INCLUDES = -I$(top_srcdir)/include
 
-LDADD = ../src/libqpipe.a
+LDADD = ../src/libqpipe.a $(BDB_HOME)/lib/libdb_cxx.a
 
 # define programs here
 bin_PROGRAMS = \

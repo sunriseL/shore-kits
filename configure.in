@@ -266,7 +266,7 @@ AC_SUBST(BDB_HOME)
 #OPT_FLAGS="-pg -O3 -finline-limit=1200"
 CXXFLAGS="-g $OPT_FLAGS -Wall -Wcast-align -Wextra -Wfloat-equal \
 	-Wconversion -Wno-system-headers -D_REENTRANT -I$BDB_HOME/include"
-LDFLAGS="-lnsl -ldl -lm -lpthread -ldb_cxx -L$BDB_HOME/lib"
+LDFLAGS="-lnsl -ldl -lm -lpthread"
 if test "$ARCHOS" = "SPARC_SUN"; then
     LDFLAGS="$LDFLAGS -lsocket -lrt"
 else
