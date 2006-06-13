@@ -17,6 +17,8 @@
 #include "dispatcher.h"
 #include "tester_thread.h"
 
+#include "db_cxx.h"
+
 #include <unistd.h>
 #include <sys/time.h>
 #include <math.h>
@@ -199,8 +201,8 @@ public:
 
 	if  ( ( tuple->L_SHIPDATE >= t1 ) &&
 	      ( tuple->L_SHIPDATE < t2 ) &&
-              //	      ( tuple->L_DISCOUNT >= (DISCOUNT - 0.01)) &&
-	      // ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
+	      ( tuple->L_DISCOUNT >= (DISCOUNT - 0.01)) &&
+	      ( tuple->L_DISCOUNT <= (DISCOUNT + 0.01)) &&
 	      ( tuple->L_QUANTITY < (QUANTITY)) )
 	    {
 		//printf("+");

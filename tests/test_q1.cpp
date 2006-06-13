@@ -197,7 +197,7 @@ public:
 	tpch_lineitem_tuple *tuple = (tpch_lineitem_tuple*)input.data;
 
         // FIXME: reversed on purpose to reduce selectivity...
-	if  ( tuple->L_SHIPDATE >= t ) {
+	if  ( tuple->L_SHIPDATE <= t ) {
             //	    printf("+");
 	    return (true);
 	}
