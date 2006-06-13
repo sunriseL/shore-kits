@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
     thread_init();
     int THREAD_POOL_SIZE = 20;
 
-    bool do_echo;
+    bool do_echo = true;
     
 
     // parse command line args

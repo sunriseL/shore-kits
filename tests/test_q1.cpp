@@ -525,11 +525,8 @@ int main() {
         dispatcher_t::dispatch_packet(q1_agg_packet);
     
         tuple_t output;
-        agg_output_buffer.init_buffer();
-
 	TRACE(TRACE_ALWAYS, "*** Q1 ANSWER ...\n");
 	TRACE(TRACE_ALWAYS, "*** SUM_QTY\tSUM_BASE\tSUM_DISC...\n");
-
         while(agg_output_buffer.get_tuple(output)) {
             aggregate_tuple *tuple;
             tuple = (aggregate_tuple *) output.data;

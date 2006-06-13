@@ -47,7 +47,6 @@ bool merge_stage_t::buffer_head_t::init(tuple_buffer_t *buf,
 {
     buffer = buf;
     cmp = c;
-    buffer->init_buffer();
     int size = buffer->tuple_size;
     data = new char[size];
     tuple = tuple_t(data, size);

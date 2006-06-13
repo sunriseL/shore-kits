@@ -2,14 +2,16 @@
 #ifndef __TSCAN_H
 #define __TSCAN_H
 
-# include "db_cxx.h"
-# include "tuple.h"
-# include "packet.h"
-# include "stage.h"
+#include "db_cxx.h"
+#include "tuple.h"
+#include "packet.h"
+#include "stage.h"
 
 
 
 using namespace qpipe;
+
+
 
 /**
  *@brief Packet definition for the Tscan stage
@@ -81,6 +83,8 @@ class tscan_stage_t : public stage_t {
 public:
 
     static const char* DEFAULT_STAGE_NAME;
+
+    static const size_t TSCAN_BULK_READ_BUFFER_SIZE;
 
     tscan_stage_t() { }
 

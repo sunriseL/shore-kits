@@ -711,9 +711,6 @@ public:
         return check_for_input() < 0;
     }
 
-    void init_buffer();
-    int wait_init(bool block=true);
-
 
     /**
      *  @brief Construct a tuple buffer that holds tuples of the
@@ -778,9 +775,6 @@ struct buffer_guard_t {
 
     buffer_guard_t &operator=(tuple_buffer_t *buf) {
         buffer = buf;
-        if(buffer)
-            buffer->init_buffer();
-        
         return *this;
     }
 

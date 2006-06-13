@@ -42,10 +42,10 @@ const char* sort_stage_t::DEFAULT_STAGE_NAME = "SORT_STAGE";
 
 
 
-const unsigned int sort_stage_t::MERGE_FACTOR = 3;
+const unsigned int sort_stage_t::MERGE_FACTOR = 8;
 
 
-const unsigned int sort_stage_t::PAGES_PER_INITIAL_SORTED_RUN = 3;
+const unsigned int sort_stage_t::PAGES_PER_INITIAL_SORTED_RUN = 8 * 1024;
 
 
 

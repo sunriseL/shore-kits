@@ -427,8 +427,6 @@ int main() {
         dispatcher_t::dispatch_packet(q6_agg_packet);
     
         tuple_t output;
-        agg_output_buffer.init_buffer();
-
         double * r = NULL;
         while(agg_output_buffer.get_tuple(output)) {
             r = (double*)output.data;

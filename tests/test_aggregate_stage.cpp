@@ -147,7 +147,6 @@ int main(int argc, char* argv[]) {
     dispatcher_t::dispatch_packet(agg_packet);
     
     tuple_t output;
-    count_buffer.init_buffer();
     while(count_buffer.get_tuple(output))
         TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
     TRACE(TRACE_ALWAYS, "TEST DONE\n");

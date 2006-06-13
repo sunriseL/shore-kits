@@ -22,7 +22,7 @@ const char* tscan_stage_t::DEFAULT_STAGE_NAME = "TSCAN_STAGE";
  *  and do bulk reading. The blob must be aligned for int accesses and
  *  a multiple of 1024 bytes long.
  */
-#define TSCAN_BULK_READ_BUFFER_SIZE 256*KB
+const size_t tscan_stage_t::TSCAN_BULK_READ_BUFFER_SIZE=256*KB;
 
 
 
