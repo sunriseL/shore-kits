@@ -263,7 +263,7 @@ AC_SUBST(QPIPE_VERSION)
 AC_SUBST(BDB_HOME)
 
 # basic flags/libs every arch needs
-#OPT_FLAGS="-pg -O3 -finline-limit=1200"
+OPT_FLAGS="-pg -O3 -finline-limit=1200"
 CXXFLAGS="-g $OPT_FLAGS -Wall -Wcast-align -Wextra -Wfloat-equal \
 	-Wconversion -Wno-system-headers -D_REENTRANT -I$BDB_HOME/include"
 LDFLAGS="-lnsl -ldl -lm -lpthread"

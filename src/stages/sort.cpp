@@ -42,13 +42,15 @@ const char* sort_stage_t::DEFAULT_STAGE_NAME = "SORT_STAGE";
 
 
 
-const size_t sort_stage_t::MERGE_FACTOR = 3;
+const unsigned int sort_stage_t::MERGE_FACTOR = 3;
+
+
+const unsigned int sort_stage_t::PAGES_PER_INITIAL_SORTED_RUN = 3;
 
 
 
-static FILE *create_tmp_file(string &name);
-static void flush_page(tuple_page_t *page, FILE *file,
-                       const string &file_name);
+static FILE* create_tmp_file(string& name);
+static void flush_page(tuple_page_t* page, FILE* file, const string& file_name);
 
 
 
@@ -92,7 +94,7 @@ void sort_stage_t::check_finished_merges() {
 
 
 
-void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor)
+void sort_stage_t::start_merge(int new_level, run_list_t& runs, int merge_factor)
 {
 
     assert(merge_factor > 0);
@@ -118,11 +120,23 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
 	
         fscan_packet_t* p;
         tuple_buffer_t* buf = new tuple_buffer_t(_tuple_size);
-        p = new fscan_packet_t("sort-fscan",
+
+
+        char* fscan_packet_id;
+        int   fscan_packet_id_ret =
+            asprintf(&fscan_packet_id, "SORT_FSCAN_PACKET_%d", i);
+        assert( fscan_packet_id_ret != -1 );
+
+        char* filename;
+        int   filename_ret =
+            asprintf(&filename, "%s", run_filename.c_str());
+        assert( filename_ret != -1 );
+        
+        
+        p = new fscan_packet_t(fscan_packet_id,
 			       buf,
                                new tuple_filter_t(_tuple_size),
-                               _adaptor->get_packet()->client_buffer,
-                               run_filename.c_str());
+                               filename);
         dispatcher_t::dispatch_packet(p);
 
 	merge._inputs.push_back(run_filename.c_str());
@@ -133,12 +147,17 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
     // create a merge packet to consume the fscans
     merge_packet_t* mp;
     tuple_buffer_t* merge_out = new tuple_buffer_t(_tuple_size);
-    mp = new merge_packet_t("Sort-merge",
+
+
+    char* merge_packet_id;
+    int   merge_packet_id_ret = asprintf(&merge_packet_id, "SORT_MERGE_PACKET");
+    assert( merge_packet_id_ret != -1 );
+
+    
+    mp = new merge_packet_t(merge_packet_id,
                             merge_out,
-                            _adaptor->get_packet()->client_buffer,
-                            fscan_buffers,
                             new tuple_filter_t(_tuple_size),
-                            merge_factor,
+                            fscan_buffers,
                             _comparator);
     dispatcher_t::dispatch_packet(mp);
 
@@ -156,14 +175,27 @@ void sort_stage_t::start_merge(int new_level, run_list_t &runs, int merge_factor
     fdump_packet_t* fp;
     tuple_buffer_t* fdump_out;
     string file_name;
+
+
     // KLUDGE! the fdump stage will reopen the file
     fclose(create_tmp_file(file_name));
     fdump_out = new tuple_buffer_t(_tuple_size);
-    fp = new fdump_packet_t("merge-fdump",
+
+    
+    char* fdump_packet_id;
+    int   fdump_packet_id_ret = asprintf(&fdump_packet_id, "SORT_FDUMP_PACKET");
+    assert( fdump_packet_id_ret != -1 );
+    
+    char* fdump_filename;
+    int   fdump_filename_ret = asprintf(&fdump_filename, file_name.c_str());
+    assert( fdump_filename_ret != -1 );
+
+    
+    fp = new fdump_packet_t(fdump_packet_id,
                             fdump_out,
+                            new tuple_filter_t(merge_out->tuple_size),
                             merge_out,
-                            _adaptor->get_packet()->client_buffer,
-                            file_name.data(),
+                            fdump_filename,                            
                             &_monitor);
     dispatcher_t::dispatch_packet(fp);
 
@@ -355,28 +387,29 @@ stage_t::result_t sort_stage_t::process_packet() {
 
     sort_packet_t *packet = (sort_packet_t *)_adaptor->get_packet();
 
-    _input = packet->input_buffer;
-    _comparator = packet->compare;
-    _tuple_size = _input->tuple_size;
+    _input_buffer = packet->_input_buffer;
+    _tuple_size = _input_buffer->tuple_size;
+    _comparator = packet->_comparator;
     _sorting_finished = false;
 
-    // do we even have any inputs?
-    _input->init_buffer();
-    if(_input->wait_for_input())
+
+    dispatcher_t::dispatch_packet(packet->_input);
+
+
+    // quick optimization: if no input tuples, simply return
+    if(_input_buffer->wait_for_input())
         return stage_t::RESULT_STOP;
     
     // create a buffer page for writing to file
     page_guard_t out_page = tuple_page_t::alloc(_tuple_size, malloc);
     
-    // the number of pages per initial run
-    int page_count = 3;
-
     // create a key array 
-    int capacity = tuple_page_t::capacity(_input->page_size(),
-                                          _tuple_size);
-    int tuple_count = page_count*capacity;
+    int capacity =
+        tuple_page_t::capacity(_input_buffer->page_size(), _tuple_size);
+    int tuple_count = PAGES_PER_INITIAL_SORTED_RUN * capacity;
     key_vector_t array;
     array.reserve(tuple_count);
+
 
 
     // use a monitor thread to control the hierarchical merge
@@ -390,15 +423,16 @@ stage_t::result_t sort_stage_t::process_packet() {
     }
 
 
+
     // create sorted runs
     do {
         // TODO: check for early termination at regular intervals
         
         page_list_guard_t page_list;
         array.clear();
-        for(int i=0; i < page_count; i++) {
+        for(unsigned int i=0; i < PAGES_PER_INITIAL_SORTED_RUN; i++) {
             // read in a run of pages
-            tuple_page_t *page = _input->get_page();
+            tuple_page_t *page = _input_buffer->get_page();
             if(!page)
                 break;
 
@@ -436,7 +470,7 @@ stage_t::result_t sort_stage_t::process_packet() {
             flush_page(out_page, file, file_name);
 
         // are we done?
-        bool eof = _input->wait_for_input();
+        bool eof = _input_buffer->wait_for_input();
         
         // notify the merge monitor thread that another run is ready
         critical_section_t cs(&_monitor._lock);
@@ -473,32 +507,10 @@ stage_t::result_t sort_stage_t::process_packet() {
 
 
 
-sort_stage_t::~sort_stage_t()  {
-    // make sure the monitor thread exits before we do...
-    if(_monitor_thread && pthread_join(_monitor_thread, NULL)) {
-        TRACE(TRACE_ALWAYS, "sort stage unable to join on monitor thread");
-        QPIPE_PANIC();
-    }
-
-    // also, remove any remaining temp files
-    merge_map_t::iterator level_it=_merge_map.begin();
-    while(level_it != _merge_map.end()) {
-        merge_list_t::iterator it = level_it->second.begin();
-        while(it != level_it->second.end()) {
-            remove_input_files(it->_inputs);
-            ++it;
-        }
-        ++level_it;
-    }
-}
-
-
-
 /**
  * @brief flush (page) to (file) and clear it. PANIC on error.
  */
-static void flush_page(tuple_page_t *page, FILE *file,
-                       const string &file_name) {
+static void flush_page(tuple_page_t* page, FILE* file, const string& file_name) {
     if(page->fwrite_full_page(file)) {
         TRACE(TRACE_ALWAYS, "Error writing sorted run to file\n",
               file_name.data());
@@ -516,7 +528,7 @@ static void flush_page(tuple_page_t *page, FILE *file,
  *
  * @return the file or NULL on error
  */
-static FILE *create_tmp_file(string &name) {
+static FILE* create_tmp_file(string& name) {
     // TODO: use a configurable temp dir
     char name_template[] = "tmp/sort-run.XXXXXX";
     int fd = mkstemp(name_template);
@@ -540,6 +552,8 @@ static FILE *create_tmp_file(string &name) {
     return file;
 }
 
+
+
 int sort_stage_t::print_runs() {
     run_map_t::iterator level_it = _run_map.begin();
     for( ; level_it != _run_map.end(); ++level_it) {
@@ -552,6 +566,8 @@ int sort_stage_t::print_runs() {
     }
     return 0;
 }
+
+
 
 int sort_stage_t::print_merges() {
     merge_map_t::iterator level_it = _merge_map.begin();
@@ -572,7 +588,7 @@ int sort_stage_t::print_merges() {
 
 
 
-void sort_stage_t::remove_input_files(run_list_t &files) {
+void sort_stage_t::remove_input_files(run_list_t& files) {
     // delete the files from disk. The delete will occur as soon as
     // all current file handles are closed
     for(run_list_t::iterator it=files.begin(); it != files.end(); ++it) {

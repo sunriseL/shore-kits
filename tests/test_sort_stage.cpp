@@ -6,6 +6,7 @@
 #include "stages/fscan.h"
 #include "stages/fdump.h"
 #include "stages/merge.h"
+#include "stages/func_call.h"
 #include "trace/trace.h"
 #include "qpipe_panic.h"
 #include "stage_container.h"
@@ -18,7 +19,9 @@ using std::vector;
 using namespace qpipe;
 
 
-int values = 1800;
+int num_values;
+int num_copies;
+
 
 
 /**
@@ -35,41 +38,38 @@ void* drive_stage(void* arg)
 }
 
 
-void* write_tuples(void* arg)
+
+stage_t::result_t write_ints(void* arg)
 {
     tuple_buffer_t *buffer = (tuple_buffer_t *)arg;
 
     // produce a set of inputs, with duplicated values
-    static const int copies = 5;
     vector<int> inputs;
-    inputs.reserve(values*copies);
-    for(int i=0; i < values; i++)
-        for(int j=0; j < copies; j++)
+    inputs.reserve(num_values * num_copies);
+    for(int i=0; i < num_values; i++)
+        for(int j=0; j < num_copies; j++)
             inputs.push_back(i);
 
     // shuffle the input
     std::random_shuffle(inputs.begin(), inputs.end());
 
-    // wait for the parent to wake me up...
-    buffer->wait_init();
-    
     int value;
     tuple_t input((char *)&value, sizeof(int));
     for(unsigned  i=0; i < inputs.size(); i++) {
         value = inputs[i];
         if(buffer->put_tuple(input))
-            {
-                TRACE(TRACE_ALWAYS, "buffer->put_tuple() returned non-zero!\n");
-                TRACE(TRACE_ALWAYS, "Terminating loop...\n");
-                break;
-            }
-        //        else
-        //            TRACE(TRACE_ALWAYS, "Inserted tuple %d\n", value);
+        {
+            TRACE(TRACE_ALWAYS, "buffer->put_tuple() returned non-zero!\n");
+            TRACE(TRACE_ALWAYS, "Terminating loop...\n");
+            break;
+        }
     }
+
     TRACE(TRACE_ALWAYS, "Finished inserting tuples\n", value);
-    buffer->send_eof();
-    return NULL;
+    return stage_t::RESULT_STOP;
 }
+
+
 
 struct int_tuple_comparator_t : public tuple_comparator_t {
     virtual int compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b) {
@@ -87,19 +87,26 @@ int main(int argc, char* argv[]) {
     thread_init();
     int THREAD_POOL_SIZE = 20;
 
+    bool do_echo;
     
 
-    // usage: test_sort_stage <values> [off]
-    if ( argc >= 2 ) {
-	values = atoi(argv[1]);
-	if (values == 0) {
-	    TRACE(TRACE_ALWAYS, "%s is not a number\n", argv[1]);
-	    exit(-1);
-	}
+    // parse command line args
+    if ( argc < 3 ) {
+	TRACE(TRACE_ALWAYS, "Usage: %s <num values> <num copies> [off]\n", argv[0]);
+	exit(-1);
     }
-    bool do_echo = true;
-    if ( (argc >= 3) && !strcmp(argv[2], "off") )
-	do_echo = false;
+    num_values = atoi(argv[1]);
+    if ( num_values == 0 ) {
+	TRACE(TRACE_ALWAYS, "Invalid num values %s\n", argv[1]);
+	exit(-1);
+    }
+    num_copies = atoi(argv[2]);
+    if ( num_copies == 0 ) {
+	TRACE(TRACE_ALWAYS, "Invalid num copies %s\n", argv[2]);
+	exit(-1);
+    }
+    if ( (argc > 3) && !strcmp(argv[3], "off") )
+        do_echo = false;
 
 
 
@@ -146,36 +153,51 @@ int main(int argc, char* argv[]) {
     }
 
 
-    // for now just sort straight tuples
-    tuple_buffer_t  input_buffer(sizeof(int));
-    tester_thread_t* writer_thread = new tester_thread_t(write_tuples, &input_buffer, "WRITER THREAD");
-    if ( thread_create( NULL, writer_thread ) ) {
-        TRACE(TRACE_ALWAYS, "thread_create failed\n");
-        QPIPE_PANIC();
+    // for now just sort ints
+    sc = new stage_container_t("FUNC_CALL_CONTAINER", new stage_factory<func_call_stage_t>);
+    dispatcher_t::register_stage_container(func_call_packet_t::PACKET_TYPE, sc);
+    tester_thread_t* func_call_thread =  new tester_thread_t(drive_stage, sc, "FUNC_CALL_THREAD");
+    if ( thread_create( NULL, func_call_thread ) ) {
+	TRACE(TRACE_ALWAYS, "thread_create() failed\n");
+	QPIPE_PANIC();
     }
+    
 
-   
-    // the output is always a single int
+    tuple_buffer_t  int_buffer(sizeof(int));
+    char* func_call_packet_id;
+    int func_call_packet_id_ret =
+        asprintf( &func_call_packet_id, "FUNC_CALL_PACKET_1" );
+    assert( func_call_packet_id_ret != -1 );
+    func_call_packet_t* fc_packet = 
+	new func_call_packet_t(func_call_packet_id,
+                               &int_buffer, 
+                               new tuple_filter_t(sizeof(int)), // unused, cannot be NULL
+                               write_ints,
+                               &int_buffer);
+
+
+    char* sort_packet_id;
+    int sort_packet_id_ret = asprintf( &sort_packet_id, "SORT_PACKET_1" );
+    assert( sort_packet_id_ret != -1 );
+
     tuple_buffer_t  output_buffer(sizeof(int));
-    tuple_filter_t* filter = new tuple_filter_t(input_buffer.tuple_size);
-    int_tuple_comparator_t *compare = new int_tuple_comparator_t;
-
-    sort_packet_t* packet = new sort_packet_t("test sort",
+    tuple_filter_t* output_filter = new tuple_filter_t(int_buffer.tuple_size);
+    int_tuple_comparator_t* compare = new int_tuple_comparator_t;
+    sort_packet_t* packet = new sort_packet_t(sort_packet_id,
                                               &output_buffer,
-                                              &output_buffer,
-                                              &input_buffer,
-                                              filter,
-                                              compare);
-
+                                              output_filter,
+                                              compare,
+                                              fc_packet);
     dispatcher_t::dispatch_packet(packet);
+
     
     tuple_t output;
-    output_buffer.init_buffer();
     while(output_buffer.get_tuple(output)) {
 	if (do_echo)
 	    TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
     }
-
     TRACE(TRACE_ALWAYS, "TEST_DONE\n");
+
+
     return 0;
 }

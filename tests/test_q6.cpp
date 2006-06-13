@@ -23,20 +23,26 @@
 #include <sys/time.h>
 #include <math.h>
 
+
+
 using namespace qpipe;
 
+
+
 extern uint32_t trace_current_setting;
+
+
 
 
 // Q6 SPECIFIC UTILS
 /* Declaration of some constants */
 
-# define DATABASE_HOME	 "."
-# define CONFIG_DATA_DIR "./database"
-# define TMP_DIR "./temp"
+#define DATABASE_HOME	 "."
+#define CONFIG_DATA_DIR "./database"
+#define TMP_DIR "./temp"
 
-# define TABLE_LINEITEM_NAME "LINEITEM"
-# define TABLE_LINEITEM_ID   "TBL_LITEM"
+#define TABLE_LINEITEM_NAME "LINEITEM"
+#define TABLE_LINEITEM_ID   "TBL_LITEM"
 
 /* Set Bufferpool equal to 450 MB -- Maximum is 4GB in 32-bit platforms */
 size_t TPCH_BUFFER_POOL_SIZE_GB = 0; /* 0 GB */
@@ -323,7 +329,7 @@ int main() {
 
     // creates a AGG stage
     stage_container_t* agg_sc = 
-	new stage_container_t("AGG_CONTAINER", new stage_factory<aggregate_stage_t>);
+	new stage_container_t("AGGREGATE_CONTAINER", new stage_factory<aggregate_stage_t>);
 
     dispatcher_t::register_stage_container(aggregate_packet_t::PACKET_TYPE, agg_sc);
 
@@ -392,10 +398,12 @@ int main() {
         tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
 
 
-        tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
+        char* tscan_packet_id;
+        int tscan_packet_id_ret = asprintf(&tscan_packet_id, "Q6_TSCAN_PACKET");
+        assert( tscan_packet_id_ret != -1 );
+        tscan_packet_t *q6_tscan_packet = new tscan_packet_t(tscan_packet_id,
                                                              &tscan_out_buffer,
                                                              tscan_filter,
-                                                             NULL, /* no need for client_buffer */
                                                              tpch_lineitem);
 
         // AGG PACKET CREATION
@@ -404,15 +412,18 @@ int main() {
         tuple_filter_t* agg_filter = new tuple_filter_t(agg_output_buffer.tuple_size);
         count_aggregate_t*  q6_aggregator = new count_aggregate_t();
     
-        aggregate_packet_t* q6_agg_packet = new aggregate_packet_t("test aggregate",
+
+        char* agg_packet_id;
+        int agg_packet_id_ret = asprintf(&agg_packet_id, "Q6_AGGREGATE_PACKET");
+        assert( agg_packet_id_ret != -1 );
+        aggregate_packet_t* q6_agg_packet = new aggregate_packet_t(agg_packet_id,
                                                                    &agg_output_buffer,
                                                                    agg_filter,
-                                                                   &tscan_out_buffer,
-                                                                   q6_aggregator);
+                                                                   q6_aggregator,
+                                                                   q6_tscan_packet);
 
 
         // Dispatch packet
-        dispatcher_t::dispatch_packet(q6_tscan_packet);
         dispatcher_t::dispatch_packet(q6_agg_packet);
     
         tuple_t output;

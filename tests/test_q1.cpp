@@ -479,46 +479,49 @@ int main() {
     }
     
 
-    for(int i=0; i < 1; i++) {
+    for(int i=0; i < 10; i++) {
         stopwatch_t timer;
         
         // TSCAN PACKET
         // the output consists of 2 doubles
 	tuple_buffer_t tscan_out_buffer(sizeof(projected_lineitem_tuple));
-        tuple_filter_t *tscan_filter = new q1_tscan_filter_t();
-        tscan_packet_t *q1_tscan_packet = new tscan_packet_t("q1 tscan",
+
+        char* tscan_packet_id;
+        int tscan_packet_id_ret = asprintf(&tscan_packet_id, "Q1_TSCAN_PACKET");
+        assert( tscan_packet_id_ret != -1 );
+        tscan_packet_t* q1_tscan_packet = new tscan_packet_t(tscan_packet_id,
                                                              &tscan_out_buffer,
-                                                             tscan_filter,
-                                                             NULL, /* no need for client_buffer */
+                                                             new q1_tscan_filter_t(),
                                                              tpch_lineitem);
    
 	// SORT PACKET
 	// the output is always a single int
-	tuple_buffer_t sort_out_buffer(sizeof(projected_lineitem_tuple));
-	tuple_filter_t* sort_filter = new tuple_filter_t(tscan_out_buffer.tuple_size);
-	tuple_comparator_t *compare = new q1_tuple_comparator_t;
-	sort_packet_t* q1_sort_packet = new sort_packet_t("q1 sort",
-							     &sort_out_buffer,
-							     &sort_out_buffer,
-							     &tscan_out_buffer,
-							     sort_filter,
-							     compare);
+        tuple_buffer_t sort_out_buffer(sizeof(projected_lineitem_tuple));
+
+        char* sort_packet_id;
+        int sort_packet_id_ret = asprintf(&sort_packet_id, "Q1_SORT_PACKET");
+        assert( sort_packet_id_ret != -1 );
+	sort_packet_t* q1_sort_packet = new sort_packet_t(sort_packet_id,
+                                                          &sort_out_buffer,
+                                                          new tuple_filter_t(tscan_out_buffer.tuple_size),
+                                                          new q1_tuple_comparator_t,
+                                                          q1_tscan_packet);
 
         // AGG PACKET CREATION
         // the output consists of 2 int
         tuple_buffer_t  agg_output_buffer(sizeof(aggregate_tuple));
-        tuple_filter_t* agg_filter = new tuple_filter_t(agg_output_buffer.tuple_size);
-        count_aggregate_t*  q1_aggregator = new count_aggregate_t();
-        aggregate_packet_t* q1_agg_packet = new aggregate_packet_t("q1 aggregate",
+
+        char* agg_packet_id;
+        int agg_packet_id_ret = asprintf(&agg_packet_id, "Q1_AGG_PACKET");
+        assert( agg_packet_id_ret != -1 );
+        aggregate_packet_t* q1_agg_packet = new aggregate_packet_t(agg_packet_id,
                                                                    &agg_output_buffer,
-                                                                   agg_filter,
-                                                                   &sort_out_buffer,
-                                                                   q1_aggregator);
+                                                                   new tuple_filter_t(agg_output_buffer.tuple_size),
+                                                                   new count_aggregate_t(),
+                                                                   q1_sort_packet);
 
 
         // Dispatch packet
-        dispatcher_t::dispatch_packet(q1_tscan_packet);
-	dispatcher_t::dispatch_packet(q1_sort_packet);
         dispatcher_t::dispatch_packet(q1_agg_packet);
     
         tuple_t output;

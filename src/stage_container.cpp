@@ -152,15 +152,15 @@ stage_t::result_t stage_container_t::stage_adaptor_t::output_page(tuple_page_t *
         for( ; page_it != page->end(); ++page_it) {
             
             // was this tuple selected?
-            if(packet->filter->select(*page_it)) {
-                if ( packet->output_buffer->alloc_tuple(out_tup) ) {
+            if(packet->_output_filter->select(*page_it)) {
+                if ( packet->_output_buffer->alloc_tuple(out_tup) ) {
                     // alloc_tuple() failed!
                     terminate = true;
                     break;
                 }
 
                 // send tuple
-                packet->filter->project(out_tup, *page_it);
+                packet->_output_filter->project(out_tup, *page_it);
             }
         }
 
@@ -312,8 +312,8 @@ bool stage_container_t::stage_adaptor_t::try_merge(packet_t* packet) {
 
 void stage_container_t::stage_adaptor_t::terminate_packet(packet_t* packet, int stage_done) {
 
-    // TODO check for error and delete
-    packet->output_buffer->send_eof();
+    // TODO check for error and delete output_buffer
+    packet->_output_buffer->send_eof();
     
 
     if ( !stage_done && (packet == _packet) ) {
@@ -323,7 +323,7 @@ void stage_container_t::stage_adaptor_t::terminate_packet(packet_t* packet, int 
     }
     
 
-    // if we are not the primary, we can simply progate shutdown to
+    // If we are not the primary, we can simply progate shutdown to
     // children (just need to delete their subtrees and packet state).
     packet->terminate_inputs();
     delete packet;
@@ -444,7 +444,7 @@ void stage_container_t::run() {
 
     
  	pointer_guard_t <stage_t> stage = _stage_maker->create_stage();
-        size_t tuple_size = packets->front()->filter->input_tuple_size();
+        size_t tuple_size = packets->front()->_output_filter->input_tuple_size();
 	stage_adaptor_t(this, packets, tuple_size).run_stage(stage);
 	
 

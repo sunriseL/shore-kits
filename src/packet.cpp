@@ -14,38 +14,50 @@
 
 /**
  *  @brief packet_t constructor.
+ *
+ *  @param packet_id The ID of this packet. This should be a block of
+ *  bytes allocated with malloc(). This packet will take ownership of
+ *  this block and invoke free() when it is destroyed.
+ *
+ *  @param packet_type The type of this packet. A packet DOES NOT own
+ *  its packet_type string (we will not invoke delete or free() on
+ *  this field in our packet destructor).
+ *
+ *  @param output_buffer The buffer where this packet should send its
+ *  data. A packet DOES NOT own its output buffer (we will not invoke
+ *  delete or free() on this field in our packet destructor).
+ *
+ *  @param output_filter The filter that will be applied to any tuple
+ *  sent to _output_buffer. The packet OWNS this filter. It will be
+ *  deleted in the packet destructor.
+ *
+ *  @param merge_enabled Whether this packet can be merged with other
+ *  packets. This parameter is passed by value, so there is no
+ *  question of ownership.
  */
 
-packet_t::packet_t(const char* _packet_id,
-		   const char* _packet_type,
-		   tuple_buffer_t* _output_buffer,
-		   tuple_filter_t* _filter,
-		   tuple_buffer_t* _client_buffer,
-                   bool _merge_enabled)
-    : merge_enabled(_merge_enabled),
-      output_buffer(_output_buffer),
-      filter(_filter),
-      client_buffer(_client_buffer),
+packet_t::packet_t(char *          packet_id,
+		   const char*     packet_type,
+		   tuple_buffer_t* output_buffer,
+		   tuple_filter_t* output_filter,
+                   bool            merge_enabled)
+    : _merge_enabled(merge_enabled),
+      _packet_id(packet_id),
+      _packet_type(packet_type),
+      _output_buffer(output_buffer),
+      _output_filter(output_filter),
       _stage_next_tuple_on_merge(0),
       _stage_next_tuple_needed(0)
 {
-
-    // need to copy the strings since we don't own them
-    if ( asprintf( &packet_id, "%s", _packet_id) == -1 ) {
-	TRACE(TRACE_ALWAYS, "asprintf() failed on packet ID %s\n",
-	      packet_id);
-	QPIPE_PANIC();
-    }
-
-    if ( asprintf( &packet_type, "%s", _packet_type) == -1 ) {
-	TRACE(TRACE_ALWAYS, "asprintf() failed on packet type %s\n",
-	      packet_type);
-	QPIPE_PANIC();
-    }
+    // error checking
+    assert(packet_id     != NULL);
+    assert(packet_type   != NULL);
+    assert(output_buffer != NULL);
+    assert(output_filter != NULL);
 
     TRACE(TRACE_PACKET_FLOW, "Created %s packet with ID %s\n",
-	  packet_type,
-	  packet_id);
+	  _packet_type,
+	  _packet_id);
 }
 
 
@@ -57,32 +69,14 @@ packet_t::packet_t(const char* _packet_id,
 packet_t::~packet_t(void) {
     
     TRACE(TRACE_PACKET_FLOW, "Destroying %s packet with ID %s\n",
-	  packet_type,
-	  packet_id);
+	  _packet_type,
+	  _packet_id);
 
-    free(packet_id);
-    free(packet_type);
-    delete filter;
+    // we own our packet_id and our filter
+    free(_packet_id);
 
-    // the output_buffer is destroyed elsewhere since we must account
-    // for the possibility that someone is consuming from it
+    delete _output_filter;
 }
-
-
-
-#ifdef DECLARED_IN_HEADER
-/**
- *  @brief Terminate the query that this packet is a part of. This
- *  is invoked when an unrecoverable error occurs when processing
- *  this packet.
- */
-void packet_t::abort_query() {
-    TRACE(TRACE_ALWAYS, "Invoked for packet of type %s with ID %s\n",
-	  packet_type,
-	  packet_id);
-    // need to terminate _client_buffer
-}
-#endif
 
 
 

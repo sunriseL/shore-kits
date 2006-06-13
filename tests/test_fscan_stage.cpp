@@ -58,15 +58,25 @@ int main(int argc, char* argv[]) {
     
     // aggregate single count result (single int)
     tuple_buffer_t int_buffer(sizeof(int));
+
+    char* fscan_packet_id;
+    int fscan_packet_id_ret =
+        asprintf( &fscan_packet_id, "FSCAN_PACKET_1" );
+    assert( fscan_packet_id_ret != -1 );
+
+    char* fscan_packet_filename;
+    int fscan_packet_filename_ret =
+        asprintf( &fscan_packet_filename, "%s", input_filename );
+    assert( fscan_packet_filename_ret != -1 );
+    
     fscan_packet_t* packet = 
-	new fscan_packet_t("FSCAN_PACKET", &int_buffer, new tuple_filter_t(int_buffer.tuple_size), &int_buffer, input_filename);
+	new fscan_packet_t(fscan_packet_id, &int_buffer, new tuple_filter_t(int_buffer.tuple_size), fscan_packet_filename);
     
     
     dispatcher_t::dispatch_packet(packet);
   
   
     tuple_t output;
-    int_buffer.init_buffer();
     while ( int_buffer.get_tuple(output) ) {
 	TRACE(TRACE_ALWAYS, "Read %d\n", *(int*)output.data);
     }

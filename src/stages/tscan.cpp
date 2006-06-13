@@ -14,6 +14,18 @@ const char* tscan_stage_t::DEFAULT_STAGE_NAME = "TSCAN_STAGE";
 
 
 
+#define KB 1024
+#define MB 1024 * KB
+
+/**
+ *  @brief BerkeleyDB cannot read into page_t's. Allocate a large blob
+ *  and do bulk reading. The blob must be aligned for int accesses and
+ *  a multiple of 1024 bytes long.
+ */
+#define TSCAN_BULK_READ_BUFFER_SIZE 256*KB
+
+
+
 /**
  * @brief A cursor guard that automatically closes the cursor when it
  * goes out of scope.
@@ -62,10 +74,8 @@ stage_t::result_t tscan_stage_t::process_packet() {
     cursor_guard_t cursor_guard(db, dbcp);
     
 
-    // BerkeleyDB cannot read into page_t's. Allocate a large blob and
-    // do bulk reading. The blob must be aligned for int accesses and a
-    // multiple of 1024 bytes long.
-    int bufsize = 1024 * (4096/sizeof(int));
+    // bulk read buffer must be aligned for int accesses
+    size_t bufsize = TSCAN_BULK_READ_BUFFER_SIZE / sizeof(int);
     array_guard_t<int> buffer = new int[bufsize];
 
     
@@ -78,11 +88,7 @@ stage_t::result_t tscan_stage_t::process_packet() {
     bulk_data.set_flags(DB_DBT_USERMEM);
 
 
-    int bulk_reads =0;
-
     for (int bulk_read_index = 0; ; bulk_read_index++) {
-
-	TRACE(TRACE_DEBUG, "%d\n", ++bulk_reads);
 
 	int err = dbcp->get(&bulk_key, &bulk_data, DB_MULTIPLE_KEY | DB_NEXT);
 	if (err) {

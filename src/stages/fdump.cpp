@@ -39,7 +39,6 @@ stage_t::result_t fdump_stage_t::process_packet() {
 
     
     tuple_buffer_t* input_buffer = packet->_input_buffer;
-    input_buffer->init_buffer();
 
     
     // read the file; make sure the buffer pages get deleted

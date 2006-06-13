@@ -91,9 +91,9 @@ void dispatcher_t::_dispatch_packet(packet_t* packet) {
 
   
   void* sc;
-  if ( static_hash_map_find( &stage_directory, packet->packet_type, &sc, NULL ) ) {
+  if ( static_hash_map_find( &stage_directory, packet->_packet_type, &sc, NULL ) ) {
     TRACE(TRACE_ALWAYS, "Packet type %s unregistered\n",
-	  packet->packet_type);
+	  packet->_packet_type);
     QPIPE_PANIC();
   }
   

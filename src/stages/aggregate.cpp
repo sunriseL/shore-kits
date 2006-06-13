@@ -2,6 +2,7 @@
 
 #include "stages/aggregate.h"
 #include "qpipe_panic.h"
+#include "dispatcher.h"
 #include "trace/trace.h"
 #include "tuple.h"
 #include "utils.h"
@@ -23,9 +24,9 @@ stage_t::result_t aggregate_stage_t::process_packet() {
     aggregate_packet_t* packet = (aggregate_packet_t*)adaptor->get_packet();
 
     
-    tuple_aggregate_t* aggregate = packet->_aggregate;
+    tuple_aggregate_t* aggregate = packet->_aggregator;
     tuple_buffer_t* input_buffer = packet->_input_buffer;
-    input_buffer->init_buffer();
+    dispatcher_t::dispatch_packet(packet->_input);
 
 
     // input buffer owns src
@@ -33,7 +34,7 @@ stage_t::result_t aggregate_stage_t::process_packet() {
 
 
     // "I" own dest, so allocate space for it on the stack
-    size_t dest_size = packet->output_buffer->tuple_size;
+    size_t dest_size = packet->_output_buffer->tuple_size;
     char dest_data[dest_size];
     tuple_t dest(dest_data, dest_size);
 

@@ -43,7 +43,7 @@ class packet_t
 
 protected:
 
-    bool merge_enabled;
+    bool _merge_enabled;
 
     virtual bool is_compatible(packet_t*) {
 	return false;
@@ -51,13 +51,11 @@ protected:
 
 public:
     
-    char* packet_id;
-    char* packet_type;
+    char* _packet_id;
+    const char* _packet_type;
     
-    tuple_buffer_t* output_buffer;
-    tuple_filter_t* filter;
-
-    tuple_buffer_t* client_buffer;
+    tuple_buffer_t* _output_buffer;
+    tuple_filter_t* _output_filter;
 
     
     /** Should be set to the stage's _stage_next_tuple field when this
@@ -74,12 +72,12 @@ public:
     unsigned int _stage_next_tuple_needed;
 
 
-    packet_t::packet_t(const char* _packet_id,
-		       const char* _packet_type,
-                       tuple_buffer_t* _output_buffer,
-                       tuple_filter_t* _filter,
-		       tuple_buffer_t* _client_buffer,
-		       bool  _merge_enabled=true);
+    /* see packet.cpp for documentation */
+    packet_t::packet_t(char*           packet_id,
+		       const char*     packet_type,
+                       tuple_buffer_t* output_buffer,
+                       tuple_filter_t* output_filter,
+		       bool            merge_enabled=true);
 
 
     virtual ~packet_t(void);
@@ -93,7 +91,7 @@ public:
      */  
     
     bool is_merge_enabled() {
-	return merge_enabled;
+	return _merge_enabled;
     }
 
     /**
@@ -109,8 +107,14 @@ public:
 
 
     void disable_merging() {
-	merge_enabled = false;	
+	_merge_enabled = false;	
     }
+
+
+    /**
+     *  @brief Destroy (delete) input buffers.
+     */
+    virtual void destroy_subpackets()=0;
 
 
     /**
@@ -119,9 +123,6 @@ public:
      *  existing packet.
      */
     virtual void terminate_inputs()=0;
-
-
-    void abort_query();
 };
 
 

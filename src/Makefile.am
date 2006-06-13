@@ -6,18 +6,15 @@ INCLUDES = -I$(top_srcdir)/include -I$(top_srcdir)/include/util
 
 
 STAGES = \
-   stages/merge.cpp \
-   stages/fdump.cpp \
    stages/fscan.cpp \
-   stages/bnl_caching_join.cpp \
+   stages/fdump.cpp \
    stages/tscan.cpp \
-   stages/sort.cpp \
-   stages/aggregate.cpp
+   stages/aggregate.cpp \
+   stages/func_call.cpp \
+   stages/merge.cpp \
+   stages/sort.cpp
 
-#\
-   stages/scalar_aggregate.cpp
-
-
+#  stages/bnl_caching_join.cpp
 
 
 TRACE = \

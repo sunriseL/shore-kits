@@ -1,4 +1,4 @@
-// -*- mode:C++; c-basic-offset:4 -*-
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 #ifndef __MERGE_H
 #define __MERGE_H
@@ -11,43 +11,98 @@
 using std::vector;
 
 
+
 using namespace qpipe;
 
+
+
 /**
- *@brief Packet definition for an N-way merge stage
+ *  @brief Packet definition for an N-way merge stage
  */
 struct merge_packet_t : public packet_t {
-    static const char *PACKET_TYPE;
+
+    static const char* PACKET_TYPE;
     typedef vector<tuple_buffer_t*> buffer_list_t;
     
-    buffer_list_t input_buffers;
-    size_t merge_factor;
-    tuple_comparator_t* comparator;
+    buffer_list_t       _input_buffers;
+    tuple_comparator_t* _comparator;
 
-    merge_packet_t(char *packet_id,
-                   tuple_buffer_t *out_buffer,
-                   tuple_buffer_t *client_buffer,
-                   const buffer_list_t &in_buffers,
-                   tuple_filter_t *filt,
-                   size_t factor,
-                   tuple_comparator_t *cmp)
-	: packet_t(packet_id, PACKET_TYPE, out_buffer, filt, client_buffer),
-          input_buffers(in_buffers),
-          merge_factor(factor), comparator(cmp)
+
+    /**
+     *  @brief aggregate_packet_t constructor.
+     *
+     *  @param packet_id The ID of this packet. This should point to a
+     *  block of bytes allocated with malloc(). This packet will take
+     *  ownership of this block and invoke free() when it is
+     *  destroyed.
+     *
+     *  @param output_buffer The buffer where this packet should send
+     *  its data. A packet DOES NOT own its output buffer (we will not
+     *  invoke delete or free() on this field in our packet
+     *  destructor).
+     *
+     *  @param output_filter The filter that will be applied to any
+     *  tuple sent to output_buffer. The packet OWNS this filter. It
+     *  will be deleted in the packet destructor.
+     *
+     *  @param output_filter The filter that will be applied to any
+     *  tuple sent to output_buffer. The packet OWNS this filter. It
+     *  will be deleted in the packet destructor.
+     *
+     *  @param input_buffers A list of tuple_buffer_t pointers. This
+     *  is the set of inputs that we are merging. This list should be
+     *  set up by the meta-stage that creates this merge_packet_t. We
+     *  will take ownership of the tuple_buffer_t's, but not the list
+     *  itself. We will copy the list.
+     *
+     *  @param comparator A comparator for the tuples in our input
+     *  buffers. This packet owns this comparator.
+     */
+    merge_packet_t(char*                packet_id,
+                   tuple_buffer_t*      output_buffer,
+                   tuple_filter_t*      output_filter,
+                   const buffer_list_t& input_buffers,
+                   tuple_comparator_t*  comparator)
+	: packet_t(packet_id, PACKET_TYPE, output_buffer, output_filter, false),
+          _input_buffers(input_buffers),
+          _comparator(comparator)
     {
     }
 
-    virtual void terminate_inputs();
+
+    virtual void destroy_subpackets() {
+        // MERGE has no subpackets. This should never be invoked
+        // anyway since an FDUMP is inherently non-mergeable.
+        TRACE(TRACE_ALWAYS, "MERGE is non-mergeable!\n");
+        QPIPE_PANIC();
+    }    
+    
+    
+    virtual void terminate_inputs() {	
+        
+        buffer_list_t::iterator it;
+        for (it= _input_buffers.begin(); it != _input_buffers.end(); ) {
+
+            tuple_buffer_t* _input_buffer = *it;
+
+            // TODO detect close() error and delete input_buffer
+            _input_buffer->close();
+
+            it = _input_buffers.erase(it);
+        }
+    }
 };
 
 
 
 /**
- * @brief Merge stage that merges N sorted inputs into one sorted
- * output run.
+ *  @brief Merge stage that merges N sorted inputs into one sorted
+ *  output run.
  */
 class merge_stage_t : public stage_t {
+
 private:
+
     struct buffer_head_t {
         // for the linked list
         buffer_head_t *next;
@@ -66,7 +121,8 @@ private:
     tuple_comparator_t *_comparator;
     
 public:
-    static const char *DEFAULT_STAGE_NAME;
+
+    static const char* DEFAULT_STAGE_NAME;
 
     merge_stage_t()
         : _head_list(NULL)
@@ -74,9 +130,11 @@ public:
     }
     
 protected:
+
     virtual result_t process_packet();
     
 private:
+
     void insert_sorted(buffer_head_t *head);
 };
 

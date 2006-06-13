@@ -1,18 +1,19 @@
-// -*- mode:C++; c-basic-offset:4 -*-
+/* -*- mode:C++; c-basic-offset:4 -*- */
 
 #include "stages/merge.h"
 #include <list>
 
 using std::list;
 
-void merge_packet_t::terminate_inputs() {
-    // TODO: close the input buffers
-    for(buffer_list_t::iterator it=input_buffers.begin(); it != input_buffers.end(); ++it) {
-        tuple_buffer_t *buf = *it;
-        buf->close();
-        // TODO: delete the buffer if the close fails
-    }
-}
+
+
+const char *merge_packet_t::PACKET_TYPE = "MERGE";
+
+
+
+const char *merge_stage_t::DEFAULT_STAGE_NAME = "MERGE_STAGE";
+
+
 
 /**
  * This merge stage maintains a linked list of input buffers, sorted
@@ -91,8 +92,6 @@ void merge_stage_t::insert_sorted(buffer_head_t *head)
     prev->next = head;
 }
 
-const char *merge_packet_t::PACKET_TYPE = "MERGE";
-const char *merge_stage_t::DEFAULT_STAGE_NAME = "MERGE_STAGE";
 
 
 stage_t::result_t merge_stage_t::process_packet() {
@@ -101,8 +100,8 @@ stage_t::result_t merge_stage_t::process_packet() {
 
     typedef merge_packet_t::buffer_list_t buffer_list_t;
 
-    _comparator = packet->comparator;
-    buffer_list_t &inputs = packet->input_buffers;
+    _comparator = packet->_comparator;
+    buffer_list_t &inputs = packet->_input_buffers;
     
     // allocate an array of buffer heads
     int merge_factor = inputs.size();

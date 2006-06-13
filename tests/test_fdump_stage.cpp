@@ -38,8 +38,6 @@ void* write_tuples(void* arg)
 {
     tuple_buffer_t* int_buffer = (tuple_buffer_t*)arg;
 
-    int_buffer->wait_init();
-    
     for (int i = 0; i < num_fdump_tuples; i++) {
 	tuple_t in_tuple((char*)&i, sizeof(int));
 	if( int_buffer->put_tuple(in_tuple) ) {
@@ -66,7 +64,7 @@ int main(int argc, char* argv[]) {
 	TRACE(TRACE_ALWAYS, "Usage: %s <output file> <tuple count>\n", argv[0]);
 	exit(-1);
     }
-    const char* input_filename = argv[1];
+    const char* output_filename = argv[1];
     num_fdump_tuples = atoi(argv[2]);
     if ( num_fdump_tuples == 0 ) {
 	TRACE(TRACE_ALWAYS, "Invalid tuple count %s\n", argv[2]);
@@ -101,19 +99,28 @@ int main(int argc, char* argv[]) {
     }
     
     // aggregate single count result (single int)
+    char* fdump_packet_id;
+    int fdump_packet_id_ret =
+        asprintf( &fdump_packet_id, "FDUMP_PACKET_1" );
+    assert( fdump_packet_id_ret != -1 );
+    
+    char* fdump_packet_filename;
+    int fdump_packet_filename_ret =
+        asprintf( &fdump_packet_filename, "%s", output_filename );
+    assert( fdump_packet_filename_ret != -1 );
+
     fdump_packet_t* packet = 
-	new fdump_packet_t("FDUMP_PACKET", 
+	new fdump_packet_t(fdump_packet_id,
 			   &signal_buffer, 
+                           new tuple_filter_t(int_buffer.tuple_size),
 			   &int_buffer, 
-			   &signal_buffer, 
-			   input_filename);
+			   fdump_packet_filename);
     
     
     dispatcher_t::dispatch_packet(packet);
   
   
     tuple_t output;
-    signal_buffer.init_buffer();
     TRACE(TRACE_ALWAYS, "get_tuple() returned %d\n",
 	  signal_buffer.get_tuple(output) );
     TRACE(TRACE_ALWAYS, "TEST DONE\n");

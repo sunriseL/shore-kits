@@ -34,67 +34,86 @@ public:
     
     char* _filename;
 
-    notify_t *_notifier;
+    notify_t* _notifier;
 
 
     /**
-     *  @brief FDUMP packet constructor.
+     *  @brief fscan_packet_t constructor.
      *
-     *  @param packet_id The packet identifier.
+     *  @param packet_id The ID of this packet. This should point to a
+     *  block of bytes allocated with malloc(). This packet will take
+     *  ownership of this block and invoke free() when it is
+     *  destroyed.
      *
-     *  @param out_buffer No real data will be transmitted through
-     *  this buffer. The worker thread processing this packet will
-     *  simply invoke send_eof() on this buffer when the file has been
-     *  completely sent to disk.
+     *  @param output_buffer The buffer where this packet should send
+     *  its data. A packet DOES NOT own its output buffer (we will not
+     *  invoke delete or free() on this field in our packet
+     *  destructor).
      *
-     *  @param in_buffer The input buffer.
+     *  @param output_filter The filter that will be applied to any
+     *  tuple sent to output_buffer. The packet OWNS this filter. It
+     *  will be deleted in the packet destructor.
      *
-     *  FDUMP should not really need a tuple filter. All filtering for
-     *  the query can be moved to the stage feeding the FDUMP. For
-     *  this reason, we simple pass the null-filtering capabilities of
+     *  FDUMP doesn't really need a tuple filter. All filtering for
+     *  the query can be moved to the stage feeding the FDUMP. The
+     *  caller should be able to get away with creating an instance of
      *  the tuple_filter_t base class.
+     *
+     *  @param filename The name of the file to scan. This should be a
+     *  block of bytes allocated with malloc(). This packet will take
+     *  ownership of this block and invoke free() when it is
+     *  destroyed.
+     *
+     *  @param notifier An optional notify_t instance that the worker
+     *  thread will invoke notify() on when the FDUMP operation is
+     *  complete. Pass NULL to avoid this behavior. Even if a non-NULL
+     *  value is passed, this packet WILL NOT take ownership of this
+     *  object. We will however, invoke notify() on this parameter in
+     *  our destructor.
      */    
-    fdump_packet_t(char* packet_id,
+    fdump_packet_t(char*           packet_id,
 		   tuple_buffer_t* output_buffer,
+                   tuple_filter_t* output_filter,
 		   tuple_buffer_t* input_buffer,
-                   tuple_buffer_t* client_buffer,
-		   const char*     filename,
-                   notify_t *notifier=NULL)
-	: packet_t(packet_id, PACKET_TYPE, output_buffer,
-                   new tuple_filter_t(input_buffer->tuple_size), client_buffer),
-	  _input_buffer(input_buffer), _notifier(notifier)
+		   char*           filename,
+                   notify_t*       notifier=NULL)
+	: packet_t(packet_id, PACKET_TYPE, output_buffer, output_filter, false),
+	  _input_buffer(input_buffer),
+          _filename(filename),
+          _notifier(notifier)
     {
-	if ( asprintf(&_filename, "%s", filename) == -1 ) {
-	    TRACE(TRACE_ALWAYS, "asprintf() failed on filename %s\n",
-		  filename);
-	    QPIPE_PANIC();
-	}
     }
 
 
     virtual ~fdump_packet_t() {
-	// may have deleted _filename earlier in terminate_inputs()
-	if (_filename != NULL)
-	    free(_filename);
 
-        // let it be known that the file dump is finished
-        if(_notifier)
+        if ( _notifier != NULL )
             _notifier->notify();
+
+        // input buffer should have been set to NULL by either
+        // destroy_subpackets() or terminate_inputs()
+        assert(_input_buffer == NULL);
+
+        free(_filename);
     }
 
 
+    virtual void destroy_subpackets() {
+        // FDUMP has no subpackets. This should never be invoked
+        // anyway since an FDUMP is inherently non-mergeable.
+        TRACE(TRACE_ALWAYS, "FDUMP is non-mergeable!\n");
+        QPIPE_PANIC();
+    }    
+
+
     virtual void terminate_inputs() {	
-	
+
 	// TODO detect close() error and delete input_buffer
 	_input_buffer->close();
+        _input_buffer = NULL;
 
-	// No longer any need to store filename separately. Set it to
-	// NULL so the destructor can know and not do a double-free().
-	free(_filename);
-	_filename = NULL;
-
-	// As for the output file, the meta-stage is responsible for
-	// deleting the file when it knows we are all done.
+        // TODO Ask the dispatcher to clear our input packet (_input)
+        // from system, if it still exists.
     }
 };
 

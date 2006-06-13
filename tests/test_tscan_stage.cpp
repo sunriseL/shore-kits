@@ -327,27 +327,19 @@ int main() {
     tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
 
 
-    tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
-							 &tscan_out_buffer,
-							 tscan_filter,
-							 NULL, /* no need for client_buffer */
-							 tpch_lineitem);
+    char* tscan_packet_id;
+    int tscan_packet_id_ret =
+        asprintf( &tscan_packet_id, "TSCAN_PACKET_1" );
+    assert( tscan_packet_id_ret != -1 );
 
-    /*
-    tscan_packet_t *q6_tscan_packet = new tscan_packet_t("q6 tscan",
-							 tpch_lineitem,
-							 sizeof(tpch_lineitem_tuple),
-							 &tscan_out_buffer,
-							 tscan_filter);
-    */
+    tscan_packet_t* q6_tscan_packet =
+        new tscan_packet_t(tscan_packet_id, &tscan_out_buffer, tscan_filter, tpch_lineitem);
 
     // Dispatch packet
     dispatcher_t::dispatch_packet(q6_tscan_packet);
     
     tuple_t output;
-    tscan_out_buffer.init_buffer();
-
-    double * d = NULL;
+    double* d = NULL;
     while(tscan_out_buffer.get_tuple(output)) {
 	d = (double*)output.data;
 	TRACE(TRACE_ALWAYS, "Read ID: EXT=%lf - DISC=%lf\n", d[0], d[1]);
