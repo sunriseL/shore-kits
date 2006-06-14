@@ -959,5 +959,6 @@ int client_t::run() {
     }
   
     free (deck);
+    return (0);
 }
 

@@ -54,6 +54,11 @@
 
 int parser_t::parse(string std_cmd) {
 
+    if (!(std_cmd.size() > 0)) {
+        TRACE( TRACE_DEBUG, "Empty command\n");
+        return (1);
+    }
+    
     // copy std_cmd
     char* cmd = (char*)malloc(std_cmd.size()*sizeof(char));
     strncpy(cmd, std_cmd.c_str(), std_cmd.size());
@@ -239,43 +244,5 @@ void parser_t::print_usage(FILE* out_stream) {
 
   fprintf(out_stream, "-----------\n");
   fprintf(out_stream, "QPipe v0.4:\n");
-  fprintf(out_stream, "-----------\n");
-  fprintf(out_stream, "QPipe Usage:\n");
-  fprintf(out_stream, "qpipe -r <command>   : Runs <command> and quits\n\n");
-  fprintf(out_stream, "qpipe -s <benchmark> : Setups environment for <benchmark> and quits\n");
-  fprintf(out_stream, "                       Benchmarks = {tpch, tpcc}\n\n");
-
-  fprintf(out_stream, "QPipe Commands:\n\n");
-
-  // SETUP cmd
-  fprintf(out_stream, "setup <type of workload> - Setups corresponding workload\n");
-  //  fprintf(out_stream, "setup tpcc               - Setup for TPC-C\n");
-  fprintf(out_stream, "setup tpch               - Setup for TPC-H\n\n");
-
-  /*
-  // TPC-C cmd
-  fprintf(out_stream, "tpcc <transaction> - Runs corresponding TPC-C transaction\n");
-  fprintf(out_stream, "tpcc neworder      - Runs NEWORDER\n");
-  fprintf(out_stream, "tpcc micro         - Runs MICRO\n");
-  fprintf(out_stream, "tpcc warehouse     - Runs WAREHOUSE\n\n");
-  */
-
-  // TPC-H cmd
-  fprintf(out_stream, "tpch <query> <clients> <compl. queries> - Executes corresponding TPC-H workload. The user may define\n");
-  fprintf(out_stream, "                                        - specific query, number of clients, and number of completed queries\n");
-  fprintf(out_stream, "tpch all                                - Executes randomly all the implemented TPC-H quiries\n\n");
-
-
-  // WORKLOAD cmd
-  fprintf(out_stream, "workload                                - Prints information about the active workloads\n");
-
-  /*
-  // MONITOR
-  fprintf(out_stream, "monitor <mon. command> - Executes corresponding monitor command\n");
-  fprintf(out_stream, "monitor start          - Starts monitor, if not started already\n");
-  fprintf(out_stream, "monitor stop           - Stops monitor, if not stopped already\n");
-  fprintf(out_stream, "monitor say <msg>      - Enqueues the <msg> in the queue for streaming\n");
-  */
-
   fprintf(out_stream, "-----------\n");
 }
