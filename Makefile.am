@@ -1,3 +1,4 @@
 # -*- makefile -*-
 
-SUBDIRS = src tests
+SUBDIRS = src tests server
+#SUBDIRS = src tests server workload

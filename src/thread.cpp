@@ -134,6 +134,17 @@ const char* thread_get_self_name(void)
 
 
 
+/** @fn     : int thread_create(pthread_t*, thread_t*)
+ *
+ *  @brief  : Creates a new thread and starts it
+ *
+ *  @param  : pthread_t * thread - A pointer to a pthread_t that will store the
+ *                                 id of the newly created thread
+ *          : thread_t * t - A tester thead the contains the function to run
+ *
+ *  @return : 0 on success, -1 otherwise
+ */
+
 int thread_create(pthread_t* thread, thread_t* t)
 {
   int err;

@@ -302,7 +302,7 @@ define([MY_AC_CONFIG_EXE_FILES],
   fi
 }])
 #MY_AC_CONFIG_FILES([Makefile src/Makefile])
-AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile server/Makefile])
 
 
 AC_OUTPUT()
