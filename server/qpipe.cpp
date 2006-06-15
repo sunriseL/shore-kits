@@ -1,4 +1,4 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+// -*- mode:C++; c-basic-offset:4 -*-
 
 /** @file    : qpipe.cpp
  *  @brief   : Basic shell functionality
@@ -32,7 +32,7 @@ int main(int, char *) {
     closeQPipe();
 
     /* exits */
-    exit(0);
+    exit(EXIT_SUCCESS);
     
     /* control never reaches here */
     QPIPE_PANIC();

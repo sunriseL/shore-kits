@@ -32,6 +32,12 @@ UTIL = \
    util/shuffle.cpp \
    util/time_util.cpp
 
+CATALOG = \
+   catalog/catalog.cpp
+
+JOB = \
+   job/job.cpp
+
 
 
 
@@ -47,4 +53,10 @@ libqpipe_a_SOURCES = \
    $(TRACE) \
    $(DISPATCHER) \
    $(UTIL)  \
-   $(STAGES)
+   $(JOB) \
+   $(STAGES) 
+
+#$(STAGES) \
+#   $(CATALOG)
+
+

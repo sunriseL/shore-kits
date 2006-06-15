@@ -469,6 +469,9 @@ int main() {
         tuple_t output;
         double * r = NULL;
 
+        //cl_1_agg_output_buffer->get_tuple(output);
+        //cl_2_agg_output_buffer->get_tuple(output);
+        
         while(cl_1_agg_output_buffer->get_tuple(output)) {
             r = (double*)output.data;
             TRACE(TRACE_ALWAYS, "*** CL1: Q6 Count: %lf. Sum: %lf.  ***\n", r[0], r[1]);

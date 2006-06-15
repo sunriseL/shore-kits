@@ -1,4 +1,4 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+// -*- mode:C++; c-basic-offset:4 -*-
 
 /** @file    : qpipe_parser.cpp
  *  @brief   : Implementation of parser of SQL and QPipe commands

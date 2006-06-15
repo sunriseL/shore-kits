@@ -1,4 +1,4 @@
-// -*- mode:C++ c-basic-offset:4 -*-
+// -*- mode:C++; c-basic-offset:4 -*-
 
 /** @file    : qpipe_wl.h
  *  @brief   : Header for workload related classes

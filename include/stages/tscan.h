@@ -52,7 +52,7 @@ public:
 		   tuple_buffer_t* output_buffer,
 		   tuple_filter_t* output_filter,
 		   Db* db)
-	: packet_t(packet_id, PACKET_TYPE, output_buffer, output_filter, false),
+	: packet_t(packet_id, PACKET_TYPE, output_buffer, output_filter, true),
 	  _db(db)
     {
         assert(db != NULL);
