@@ -74,7 +74,9 @@ stage_t::result_t tscan_stage_t::process_packet() {
     cursor_guard_t cursor_guard(db, dbcp);
     
 
-    // bulk read buffer must be aligned for int accesses
+    // BerkeleyDB cannot read into page_t's. Allocate a large blob and
+    // do bulk reading. The blob must be aligned for int accesses and a
+    // multiple of 1024 bytes long.
     size_t bufsize = TSCAN_BULK_READ_BUFFER_SIZE / sizeof(int);
     array_guard_t<int> buffer = new int[bufsize];
 

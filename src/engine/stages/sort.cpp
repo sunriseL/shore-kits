@@ -4,8 +4,9 @@
 #include "stages/merge.h"
 #include "stages/fdump.h"
 #include "stages/fscan.h"
-#include "trace.h"
+#include "trace/trace.h"
 #include "qpipe_panic.h"
+#include "util/tmpfile.h"
 #include "utils.h"
 #include <algorithm>
 #include <string>
@@ -28,7 +29,7 @@ struct tuple_less_t {
         cmp = c;
     }
     bool operator()(const key_tuple_pair_t &a, const key_tuple_pair_t &b) {
-        return cmp->compare(a, b) < 0;
+        return (cmp->compare(a, b) < 0);
     }
 };
 
@@ -43,12 +44,8 @@ const char* sort_stage_t::DEFAULT_STAGE_NAME = "SORT_STAGE";
 
 const unsigned int sort_stage_t::MERGE_FACTOR = 8;
 
-
 const unsigned int sort_stage_t::PAGES_PER_INITIAL_SORTED_RUN = 8 * 1024;
 
-
-
-static FILE* create_tmp_file(string& name);
 static void flush_page(tuple_page_t* page, FILE* file, const string& file_name);
 
 
@@ -177,7 +174,7 @@ void sort_stage_t::start_merge(int new_level, run_list_t& runs, int merge_factor
 
 
     // KLUDGE! the fdump stage will reopen the file
-    fclose(create_tmp_file(file_name));
+    fclose(create_tmp_file(file_name, "merged-run"));
     fdump_out = new tuple_buffer_t(_tuple_size);
 
     
@@ -455,7 +452,7 @@ stage_t::result_t sort_stage_t::process_packet() {
 
         // open a temp file to hold the run
         string file_name;
-        file_guard_t file = create_tmp_file(file_name);
+        file_guard_t file = create_tmp_file(file_name, "sorted-run");
 
         // dump the run to file
         //        for(int i=0; i < index; i++) {
@@ -529,39 +526,6 @@ static void flush_page(tuple_page_t* page, FILE* file, const string& file_name) 
         QPIPE_PANIC();
     }
     page->clear();
-}
-
-
-
-/**
- * @brief opens a temporary file with a unique name
- *
- * @param name string to store the new file's name in
- *
- * @return the file or NULL on error
- */
-static FILE* create_tmp_file(string& name) {
-    // TODO: use a configurable temp dir
-    char name_template[] = "tmp/sort-run.XXXXXX";
-    int fd = mkstemp(name_template);
-    if(fd < 0) {
-        TRACE(TRACE_ALWAYS, "Unable to open temporary file %s!\n",
-              name_template);
-        QPIPE_PANIC();
-    }
-    TRACE(TRACE_TEMP_FILE, "Created temp file %s\n", name_template);
-
-
-    // open a stream on the file
-    FILE *file = fdopen(fd, "w");
-    if(!file) {
-        TRACE(TRACE_ALWAYS, "Unable to open a stream on %s\n",
-              name_template);
-        QPIPE_PANIC();
-    }
-
-    name = string(name_template);
-    return file;
 }
 
 

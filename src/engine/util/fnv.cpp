@@ -33,7 +33,7 @@
  ***
  *
  * To use the recommended 32 bit FNV-1a hash, pass FNV1_32A_INIT as the
- * Fnv32_t hashval argument to fnv_32a_buf() or fnv_32a_str().
+ * uint32_t hashval argument to fnv_32a_buf() or fnv_32a_str().
  *
  ***
  *
@@ -54,13 +54,13 @@
  * Share and Enjoy!	:-)
  */
 
-#include "fnv.h"
+#include "util/fnv.h"
 
 
 /*
  * 32 bit magic FNV-1a prime
  */
-#define FNV_32_PRIME ((Fnv32_t)0x01000193)
+#define FNV_32_PRIME ((uint32_t)0x01000193)
 
 
 /*
@@ -77,12 +77,11 @@
  * NOTE: To use the recommended 32 bit FNV-1a hash, use FNV1_32A_INIT as the
  * 	 hval arg on the first call to either fnv_32a_buf() or fnv_32a_str().
  */
-#if 1
-Fnv32_t
-fnv_32a_buf(void *buf, size_t len, Fnv32_t hval)
+#if 0
+uint32_t
+fnv_hash(const char *bp, size_t len, uint32_t hval)
 {
-    unsigned char *bp = (unsigned char *)buf;	/* start of buffer */
-    unsigned char *be = bp + len;		/* beyond end of buffer */
+    const char *be = bp + len;		/* beyond end of buffer */
 
     /*
      * FNV-1a hash each octet in the buffer
@@ -90,7 +89,7 @@ fnv_32a_buf(void *buf, size_t len, Fnv32_t hval)
     while (bp < be) {
 
 	/* xor the bottom with the current octet */
-	hval ^= (Fnv32_t)*bp++;
+	hval ^= (uint32_t)*bp++;
 
 	/* multiply by the 32 bit FNV magic prime mod 2^32 */
 #if defined(NO_FNV_GCC_OPTIMIZATION)
@@ -114,19 +113,17 @@ fnv_32a_buf(void *buf, size_t len, Fnv32_t hval)
  * short (4-byte) keys, but longer keys should still be better)
  */
 static inline
-Fnv32_t mix(char val, Fnv32_t hval) {
-    hval ^= (Fnv32_t) val;
+uint32_t mix(char val, uint32_t hval) {
+    hval ^= (uint32_t) val;
     hval += (hval<<1) + (hval<<4) + (hval<<7) + (hval<<8) + (hval<<24);
     return hval;
 }
 
-Fnv32_t
-fnv_32a_buf(void *buf, size_t len, Fnv32_t hval)
+uint32_t
+fnv_hash(const char *bp, size_t len, uint32_t hval)
 {
-    unsigned char *bp = (unsigned char *)buf;	/* start of buffer */
-
     // how many (partial) loops are there?
-    size_t count = (len+7)/8;
+    const char *be = bp + len - 8;
     
     // correct the "starting" address before jumping. If len is a
     // multiple of 8 this is results in an incorrect address, but the problem
@@ -157,7 +154,7 @@ fnv_32a_buf(void *buf, size_t len, Fnv32_t hval)
             hval = mix(bp[6], hval);
         case 1:
             hval = mix(bp[7], hval);
-        } while (--count > 0);
+        } while (bp < be);
     }
 
     /* return our new hash value */
@@ -168,10 +165,10 @@ fnv_32a_buf(void *buf, size_t len, Fnv32_t hval)
 #if 0
 // Test driver
 int main() {
-    Fnv32_t hash = 0;
-    unsigned i;
-    for(i=0; i < (1 << 28); i++)
-        hash ^= fnv_32a_buf((char*) &i, sizeof(i), hash);
+    uint32_t hash = FNV_INIT;
+    unsigned i[2];
+    for(*i=0; *i < (1 << 28); ++*i)
+        hash ^= fnv_hash((char*) &i, sizeof(i), hash);
 
     return 0;
 }
