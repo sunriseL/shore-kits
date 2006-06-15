@@ -9,9 +9,9 @@
 #ifndef _TRACE_H
 #define _TRACE_H
 
-#include <cstdarg>      /* for varargs */
-#include <stdint.h>      /* for uint32_t */
-#include "trace_types.h" /* export trace types */
+#include <cstdarg>             /* for varargs */
+#include <stdint.h>            /* for uint32_t */
+#include "trace/trace_types.h" /* export trace types */
 
 
 

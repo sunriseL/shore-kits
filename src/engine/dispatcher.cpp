@@ -2,7 +2,7 @@
 #include "dispatcher.h"
 #include "util/static_hash_map.h"
 #include "util/hash_functions.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 
 #include <cstdio>

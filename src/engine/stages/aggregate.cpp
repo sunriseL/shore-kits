@@ -3,7 +3,7 @@
 #include "stages/aggregate.h"
 #include "qpipe_panic.h"
 #include "dispatcher.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "tuple.h"
 #include "utils.h"
 

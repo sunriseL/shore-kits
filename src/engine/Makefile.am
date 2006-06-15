@@ -1,7 +1,7 @@
 # -*- makefile -*-
 
 
-INCLUDES = -I$(top_srcdir)/include -I$(top_srcdir)/include/util
+INCLUDES = -I$(top_srcdir)/include -I$(top_srcdir)/include/engine
 
 
 STAGES = \

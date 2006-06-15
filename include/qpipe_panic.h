@@ -3,8 +3,8 @@
 #ifndef _QPIPE_PANIC_H
 #define _QPIPE_PANIC_H
 
-#include <cstdlib>       /* for abort() */
-#include "trace/trace.h" /* for TRACE */
+#include <cstdlib> /* for abort() */
+#include "trace.h" /* for TRACE */
 
 
 

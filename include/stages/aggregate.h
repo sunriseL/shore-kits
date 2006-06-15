@@ -8,7 +8,7 @@
 #include "tuple.h"
 #include "packet.h"
 #include "stage.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 
 

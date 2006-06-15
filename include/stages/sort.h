@@ -6,7 +6,7 @@
 #include "stage.h"
 #include "stages/merge.h"
 #include "dispatcher.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 #include <list>
 #include <map>

@@ -10,7 +10,7 @@
  * 3/3/2006: Modified and integrated to QPipe by Ippokratis Pandis 
  */
 
-#include "time_util.h"
+#include "util/time_util.h"
 
 #include <assert.h>
 

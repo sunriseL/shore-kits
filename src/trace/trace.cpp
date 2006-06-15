@@ -11,9 +11,9 @@
  *
  *  @bug None known.
  */
-#include "trace/trace.h"        /* for prototypes */
-#include <cstdio>        /* for stdout, stderr */
-#include <cstring>       /* for strlen() */
+#include "trace.h"              /* for prototypes */
+#include <cstdio>               /* for stdout, stderr */
+#include <cstring>              /* for strlen() */
 #include "trace/trace_stream.h" /* for trace_stream() */
 #include "trace/trace_force.h"  /* for TRACE_FORCE() */
 

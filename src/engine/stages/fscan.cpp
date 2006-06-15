@@ -2,7 +2,7 @@
 
 #include "stages/fscan.h"
 #include "qpipe_panic.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "tuple.h"
 
 

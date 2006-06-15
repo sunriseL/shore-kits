@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cassert>
 #include <sys/time.h>
-#include "trace/trace.h"
+#include "trace.h"
 
 
 /**

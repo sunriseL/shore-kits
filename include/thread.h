@@ -14,7 +14,7 @@
 #include <cstdarg>
 
 #include "qpipe_panic.h"
-#include "trace/trace.h"
+#include "trace.h"
 
 // include me last!!!
 #include "namespace.h"
