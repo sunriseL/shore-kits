@@ -8,11 +8,6 @@
 
 
 
-// include me last!!!
-#include "namespace.h"
-
-
-
 class tester_thread_t : public thread_t {
 
 private:
@@ -40,5 +35,4 @@ public:
 
 
 
-#include "namespace.h"
 #endif /* __TESTER_THREAD_H */

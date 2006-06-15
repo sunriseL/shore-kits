@@ -16,9 +16,6 @@
 #include "qpipe_panic.h"
 #include "trace.h"
 
-// include me last!!!
-#include "namespace.h"
-
 
 
 /**
@@ -236,10 +233,6 @@ protected:
         pthread_cond_signal_wrapper(&_notify);
     }
 };
-
-
-
-#include "namespace.h"
 
 
 

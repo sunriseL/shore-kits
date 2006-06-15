@@ -10,7 +10,7 @@
 
 
 // include me last!!!
-#include "namespace.h"
+#include "engine/namespace.h"
 
 
 
@@ -50,7 +50,7 @@ struct stage_factory : public stage_factory_t {
 
 
 
-#include "namespace.h"
+#include "engine/namespace.h"
 
 
 

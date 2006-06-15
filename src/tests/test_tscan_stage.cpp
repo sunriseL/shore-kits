@@ -12,7 +12,7 @@
 #include "thread.h"
 #include "stage_container.h"
 #include "stages/tscan.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 #include "dispatcher.h"
 #include "tester_thread.h"

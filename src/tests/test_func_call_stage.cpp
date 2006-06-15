@@ -3,7 +3,7 @@
 #include "thread.h"
 #include "stage_container.h"
 #include "stages/func_call.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 
 #include "dispatcher.h"

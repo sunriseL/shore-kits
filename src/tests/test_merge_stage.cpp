@@ -4,7 +4,7 @@
 #include "tester_thread.h"
 #include "stages/func_call.h"
 #include "stages/merge.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 #include <utility>
 #include <vector>

@@ -35,14 +35,12 @@ extern "C" void* start_thread(void *);
 
 
 
-// include me last!!!
-#include "namespace.h"
-
+/* method definitions */
 
 
 const char* thread_t::get_thread_name(void)
 {
-  return thread_name;
+    return thread_name;
 }
 
 
@@ -50,47 +48,47 @@ const char* thread_t::get_thread_name(void)
 thread_t::~thread_t(void)
 {
   
-  // error checking
-  if ( thread_name == NULL ) {
-    TRACE(TRACE_ALWAYS, "NULL thread_name!\n");
-    TRACE(TRACE_ALWAYS, "Missing an init_thread_name() call in a subclass constructor?\n");
-  }
-  else
-    // thread_name was created with malloc()
-    free(thread_name);
+    // error checking
+    if ( thread_name == NULL ) {
+        TRACE(TRACE_ALWAYS, "NULL thread_name!\n");
+        TRACE(TRACE_ALWAYS, "Missing an init_thread_name() call in a subclass constructor?\n");
+    }
+    else
+        // thread_name was created with malloc()
+        free(thread_name);
 }
 
 
 
 thread_t::thread_t(void)
 {
-  thread_name = NULL;
+    thread_name = NULL;
 }
 
 
 
 int thread_t::init_thread_name(const char* format, ...)
 {
-  int ret;
-  va_list ap;
-  va_start(ap, format);
-  ret = init_thread_name_v(format, ap);
-  va_end(ap);
-  return ret;
+    int ret;
+    va_list ap;
+    va_start(ap, format);
+    ret = init_thread_name_v(format, ap);
+    va_end(ap);
+    return ret;
 }
 
 
 
 int thread_t::init_thread_name_v(const char* format, va_list ap)
 {
-  // construct thread name
-  if ( vasprintf(&thread_name, format, ap) == -1 )
-  {
-    TRACE(TRACE_ALWAYS, "vasprintf() failed to initialize thread_name\n");
-    return -1;    
-  }
+    // construct thread name
+    if ( vasprintf(&thread_name, format, ap) == -1 )
+    {
+        TRACE(TRACE_ALWAYS, "vasprintf() failed to initialize thread_name\n");
+        return -1;    
+    }
   
-  return 0;
+    return 0;
 }
 
 
@@ -103,80 +101,80 @@ int thread_t::init_thread_name_v(const char* format, va_list ap)
 
 void thread_init(void)
 {
-  if ( pthread_key_create( &THREAD_KEY_SELF, thread_destroy ) )
-  {
-    TRACE(TRACE_ALWAYS, "pthread_key_create() failed on THREAD_KEY_SELF\n");
-    QPIPE_PANIC();
-  }
-  if ( pthread_key_create( &THREAD_KEY_SELF_NAME, NULL ) )
-  {
-    TRACE(TRACE_ALWAYS, "pthread_key_create() failed on THREAD_KEY_SELF_NAME\n");
-    QPIPE_PANIC();
-  }
+    if ( pthread_key_create( &THREAD_KEY_SELF, thread_destroy ) )
+    {
+        TRACE(TRACE_ALWAYS, "pthread_key_create() failed on THREAD_KEY_SELF\n");
+        QPIPE_PANIC();
+    }
+    if ( pthread_key_create( &THREAD_KEY_SELF_NAME, NULL ) )
+    {
+        TRACE(TRACE_ALWAYS, "pthread_key_create() failed on THREAD_KEY_SELF_NAME\n");
+        QPIPE_PANIC();
+    }
 
-  int err;
-  err = pthread_setspecific(THREAD_KEY_SELF_NAME, "root-thread");
-  if (err)
-    thread_fatal_error("pthread_setspecific()", err);
+    int err;
+    err = pthread_setspecific(THREAD_KEY_SELF_NAME, "root-thread");
+    if (err)
+        thread_fatal_error("pthread_setspecific()", err);
 }
  
 
 
 const char* thread_get_self_name(void)
 {
-  // It would be nice to verify that the name returned is not
-  // NULL. However, the name of the root thread can be NULL if we have
-  // not yet completely initialized it.
-  const char* thread_name =
-    (const char*)pthread_getspecific(THREAD_KEY_SELF_NAME);
-  return thread_name;
+    // It would be nice to verify that the name returned is not
+    // NULL. However, the name of the root thread can be NULL if we have
+    // not yet completely initialized it.
+    const char* thread_name =
+        (const char*)pthread_getspecific(THREAD_KEY_SELF_NAME);
+    return thread_name;
 }
 
 
 
-/** @fn     : int thread_create(pthread_t*, thread_t*)
+/**
+ *  @brief Creates a new thread and starts it.
  *
- *  @brief  : Creates a new thread and starts it
+ *  @param thread A pointer to a pthread_t that will store the ID of
+ *  the newly created thread.
  *
- *  @param  : pthread_t * thread - A pointer to a pthread_t that will store the
- *                                 id of the newly created thread
- *          : thread_t * t - A tester thead the contains the function to run
+ *  @param t - A thead that contains the function to run.
  *
- *  @return : 0 on success, -1 otherwise
+ *  @return 0 on success. Non-zero on error.
  */
 
 int thread_create(pthread_t* thread, thread_t* t)
 {
-  int err;
-  pthread_t tid;
-  pthread_attr_t pattr;
+    int err;
+    pthread_t tid;
+    pthread_attr_t pattr;
 
   
-  // create a new kernel schedulable thread
-  err = pthread_attr_init( &pattr );
-  if (err) {
-    thread_error("pthread_attr_init()", err);
-    return -1;
-  }
+    // create a new kernel schedulable thread
+    err = pthread_attr_init( &pattr );
+    if (err) {
+        thread_error("pthread_attr_init()", err);
+        return -1;
+    }
   
-  err = pthread_attr_setscope( &pattr, PTHREAD_SCOPE_SYSTEM );
-  if (err) {
-    thread_error("pthread_attr_setscope()", err);
-    return -1;
-  }
+    err = pthread_attr_setscope( &pattr, PTHREAD_SCOPE_SYSTEM );
+    if (err) {
+        thread_error("pthread_attr_setscope()", err);
+        return -1;
+    }
   
-  err = pthread_create(&tid, &pattr, start_thread, t);
-  if (err) {
-    thread_error("pthread_create()", err);
-    return -1;
-  }
+    err = pthread_create(&tid, &pattr, start_thread, t);
+    if (err) {
+        thread_error("pthread_create()", err);
+        return -1;
+    }
   
-  // thread created ... wait for it to initialize?
-  // for now, assume it succeeds
+    // thread created ... wait for it to initialize?
+    // for now, assume it succeeds
   
-  if ( thread != NULL )
-    *thread = tid;
-  return 0;
+    if ( thread != NULL )
+        *thread = tid;
+    return 0;
 }
 
 
@@ -279,9 +277,6 @@ void pthread_cond_wait_wrapper(pthread_cond_t* cond, pthread_mutex_t* mutex)
     thread_fatal_error("pthread_cond_wait()", err);
 }
 
-#include "namespace.h"
-
-
 
 
 /**
@@ -295,21 +290,21 @@ void pthread_cond_wait_wrapper(pthread_cond_t* cond, pthread_mutex_t* mutex)
 
 void* start_thread(void* thread_object)
 {
-  qpipe::thread_t* thread = (qpipe::thread_t*)thread_object;
+    thread_t* thread = (thread_t*)thread_object;
 
-  int err;
+    int err;
 
-  // Register local data. Should not fail since we only need two
-  // pieces of thread-specific storage.
-  err = pthread_setspecific(THREAD_KEY_SELF, thread);
-  if (err)
-    thread_fatal_error("pthread_setspecific() on THREAD_KEY_SELF", err);
+    // Register local data. Should not fail since we only need two
+    // pieces of thread-specific storage.
+    err = pthread_setspecific(THREAD_KEY_SELF, thread);
+    if (err)
+        thread_fatal_error("pthread_setspecific() on THREAD_KEY_SELF", err);
   
-  err = pthread_setspecific(THREAD_KEY_SELF_NAME, thread->get_thread_name());
-  if (err)
-    thread_fatal_error("pthread_setspecific() on THREAD_KEY_SELF_NAME", err);
+    err = pthread_setspecific(THREAD_KEY_SELF_NAME, thread->get_thread_name());
+    if (err)
+        thread_fatal_error("pthread_setspecific() on THREAD_KEY_SELF_NAME", err);
   
-  return thread->run();
+    return thread->run();
 }
 
 
@@ -319,27 +314,27 @@ void* start_thread(void* thread_object)
 
 static void thread_error(const char* function_name, int err)
 {
-  char error_buf[MAX_STRERROR_STRING_SIZE];
-  if ( strerror_r(err, error_buf, MAX_STRERROR_STRING_SIZE) ) {
-      TRACE(TRACE_ALWAYS, "%s failed\n", function_name);
-      TRACE(TRACE_ALWAYS, "strerror_r() failed to parse error code\n");
-  }
-  else
-      TRACE(TRACE_ALWAYS, "%s failed: %s\n", function_name, error_buf);
+    char error_buf[MAX_STRERROR_STRING_SIZE];
+    if ( strerror_r(err, error_buf, MAX_STRERROR_STRING_SIZE) ) {
+        TRACE(TRACE_ALWAYS, "%s failed\n", function_name);
+        TRACE(TRACE_ALWAYS, "strerror_r() failed to parse error code\n");
+    }
+    else
+        TRACE(TRACE_ALWAYS, "%s failed: %s\n", function_name, error_buf);
 }
 
 
 
 static void thread_fatal_error(const char* function_name, int err)
 {
-  thread_error(function_name, err);
-  QPIPE_PANIC();
+    thread_error(function_name, err);
+    QPIPE_PANIC();
 }
 
 
 
 static void thread_destroy(void* thread_object)
 {
-  qpipe::thread_t* thread = (qpipe::thread_t*)thread_object;
-  delete thread;
+    thread_t* thread = (thread_t*)thread_object;
+    delete thread;
 }

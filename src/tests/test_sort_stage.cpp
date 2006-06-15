@@ -7,7 +7,7 @@
 #include "stages/fdump.h"
 #include "stages/merge.h"
 #include "stages/func_call.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 #include "stage_container.h"
 

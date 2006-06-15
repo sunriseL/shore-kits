@@ -1,9 +1,7 @@
 
 #include "thread.h"
-#include "trace/trace.h"
+#include "trace.h"
 
-
-using namespace qpipe;
 
 int main(int, char**)
 {

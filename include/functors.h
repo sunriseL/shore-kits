@@ -5,7 +5,7 @@
 
 #include "tuple.h"
 
-#include "namespace.h"
+#include "engine/namespace.h"
 
 
 
@@ -205,5 +205,10 @@ struct tuple_comparator_t {
     virtual ~tuple_comparator_t() { }
 };
 
-#include "namespace.h"
+
+
+#include "engine/namespace.h"
+
+
+
 #endif	// __FUNCTORS_H

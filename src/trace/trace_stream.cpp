@@ -13,10 +13,6 @@
 
 
 
-using namespace qpipe;
-
-
-
 /* internal data structures */
 
 static pthread_mutex_t stream_mutex = PTHREAD_MUTEX_INITIALIZER;
