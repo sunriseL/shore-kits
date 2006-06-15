@@ -394,22 +394,22 @@ int main() {
         
         // TSCAN PACKET
         // the output consists of 2 doubles
-        tuple_buffer_t tscan_out_buffer(2*sizeof(double));
-        tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
+        tuple_buffer_t* tscan_out_buffer = new tuple_buffer_t(2*sizeof(double));
+        tuple_filter_t* tscan_filter = new q6_tscan_filter_t();
 
 
         char* tscan_packet_id;
         int tscan_packet_id_ret = asprintf(&tscan_packet_id, "Q6_TSCAN_PACKET");
         assert( tscan_packet_id_ret != -1 );
         tscan_packet_t *q6_tscan_packet = new tscan_packet_t(tscan_packet_id,
-                                                             &tscan_out_buffer,
+                                                             tscan_out_buffer,
                                                              tscan_filter,
                                                              tpch_lineitem);
 
         // AGG PACKET CREATION
         // the output consists of 2 int
-        tuple_buffer_t  agg_output_buffer(2*sizeof(double));
-        tuple_filter_t* agg_filter = new tuple_filter_t(agg_output_buffer.tuple_size);
+        tuple_buffer_t* agg_output_buffer = new tuple_buffer_t(2*sizeof(double));
+        tuple_filter_t* agg_filter = new tuple_filter_t(agg_output_buffer->tuple_size);
         count_aggregate_t*  q6_aggregator = new count_aggregate_t();
     
 
@@ -417,7 +417,7 @@ int main() {
         int agg_packet_id_ret = asprintf(&agg_packet_id, "Q6_AGGREGATE_PACKET");
         assert( agg_packet_id_ret != -1 );
         aggregate_packet_t* q6_agg_packet = new aggregate_packet_t(agg_packet_id,
-                                                                   &agg_output_buffer,
+                                                                   agg_output_buffer,
                                                                    agg_filter,
                                                                    q6_aggregator,
                                                                    q6_tscan_packet);
@@ -428,7 +428,7 @@ int main() {
     
         tuple_t output;
         double * r = NULL;
-        while(agg_output_buffer.get_tuple(output)) {
+        while(!agg_output_buffer->get_tuple(output)) {
             r = (double*)output.data;
             TRACE(TRACE_ALWAYS, "*** Q6 Count: %lf. Sum: %lf.  ***\n", r[0], r[1]);
         }

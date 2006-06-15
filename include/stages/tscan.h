@@ -70,6 +70,13 @@ public:
         // No input buffers ... do nothing.
     }
 
+    virtual bool is_compatible(packet_t* other) {
+        // two TSCAN packets are compatible if they want to scan the
+        // same table
+        tscan_packet_t* packet = dynamic_cast<tscan_packet_t*>(other);
+        return _db == packet->_db;
+    }
+
 };
 
 

@@ -41,7 +41,6 @@ const char* sort_packet_t::PACKET_TYPE = "SORT";
 const char* sort_stage_t::DEFAULT_STAGE_NAME = "SORT_STAGE";
 
 
-
 const unsigned int sort_stage_t::MERGE_FACTOR = 8;
 
 
@@ -55,8 +54,8 @@ static void flush_page(tuple_page_t* page, FILE* file, const string& file_name);
 
 
 /**
- * @brief checks for finished merges and moves them to the finished
- * merge map so their results can be merged in turn.
+ *  @brief checks for finished merges and moves them to the finished
+ *  merge map so their results can be merged in turn.
  */
 void sort_stage_t::check_finished_merges() {
     // check for finished merges and 
@@ -416,9 +415,9 @@ stage_t::result_t sort_stage_t::process_packet() {
     thread_t *monitor;
     monitor = member_func_thread(this,
                                  &sort_stage_t::monitor_merge_packets,
-                                 "merge monitor");
+                                 "MERGE_MONITOR_THREAD");
     if(thread_create(&_monitor_thread, monitor)) {
-        TRACE(TRACE_ALWAYS, "Unable to create the merge monitor thread");
+        TRACE(TRACE_ALWAYS, "Unable to create MERGE_MONITOR_THREAD");
         QPIPE_PANIC();
     }
 
@@ -426,20 +425,25 @@ stage_t::result_t sort_stage_t::process_packet() {
 
     // create sorted runs
     do {
-        // TODO: check for early termination at regular intervals
+        // TODO: check for stage cancellation at regular intervals
         
         page_list_guard_t page_list;
         array.clear();
         for(unsigned int i=0; i < PAGES_PER_INITIAL_SORTED_RUN; i++) {
+
             // read in a run of pages
-            tuple_page_t *page = _input_buffer->get_page();
-            if(!page)
+            tuple_page_t* page;
+            int get_ret = _input_buffer->get_page(page);
+            assert( get_ret != -1 ); // TODO do actual termination
+            
+            if ( get_ret == 1 )
+                // no more pages
                 break;
 
-            // add it to the list
+            // add new page to the list
             page_list.append(page);
 
-            // add the tuples to the key array
+            // add the tuples in the page into the key array
             for(tuple_page_t::iterator it=page->begin(); it != page->end(); ++it) {
                 int key = _comparator->make_key(*it);
                 array.push_back(key_tuple_pair_t(key, it->data));
@@ -494,13 +498,21 @@ stage_t::result_t sort_stage_t::process_packet() {
         return stage_t::RESULT_ERROR;
     }
     
+
     // transfer the output of the last merge to the stage output
     tuple_t out;
-    while(merge_output->get_tuple(out)) {
+    while (1) {
+        int get_ret = merge_output->get_tuple(out);
+        assert( get_ret != -1 );
+        if (get_ret == 1)
+            // no more tuples
+            break;
+
         result_t result = _adaptor->output(out);
         if(result)
             return result;
     }
+
 
     return stage_t::RESULT_STOP;
 }
@@ -559,10 +571,10 @@ int sort_stage_t::print_runs() {
     for( ; level_it != _run_map.end(); ++level_it) {
         int level = level_it->first;
         run_list_t &runs = level_it->second;
-        printf("Level %d (%zd):\n", level, runs.size());
+        TRACE(TRACE_ALWAYS, "Level %d (%zd):\n", level, runs.size());
         run_list_t::iterator it = runs.begin();
         for( ; it != runs.end(); ++it)
-            printf("\t%s\n", it->c_str());
+            TRACE(TRACE_ALWAYS, "\t%s\n", it->c_str());
     }
     return 0;
 }
@@ -574,13 +586,13 @@ int sort_stage_t::print_merges() {
     for( ; level_it != _merge_map.end(); ++level_it) {
         int level = level_it->first;
         merge_list_t &merges = level_it->second;
-        printf("Level %d (%zd)\n", level, merges.size());
+        TRACE(TRACE_ALWAYS, "Level %d (%zd)\n", level, merges.size());
         merge_list_t::iterator it = merges.begin();
         for( ; it != merges.end(); ++it) {
-            printf("\t%s <=\n", it->_output.c_str());
+            TRACE(TRACE_ALWAYS, "\t%s <=\n", it->_output.c_str());
             run_list_t::iterator run_it = it->_inputs.begin();
             for( ; run_it != it->_inputs.end(); ++run_it) 
-                printf("\t\t%s\n", run_it->c_str());
+                TRACE(TRACE_ALWAYS, "\t\t%s\n", run_it->c_str());
         }
     }
     return 0;

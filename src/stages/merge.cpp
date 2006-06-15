@@ -54,23 +54,35 @@ bool merge_stage_t::buffer_head_t::init(tuple_buffer_t *buf,
     return has_tuple();
 }
 
-bool merge_stage_t::buffer_head_t::has_tuple() {
-    tuple_t input;
-    if(!buffer->get_tuple(input))
-        return false;
 
+
+/**
+ *  @return 0 if a tuple is removed from the buffer. 1 if the buffer
+ *  is empty and the producer has sent EOF. -1 if the buffer has been
+ *  terminated.
+ */
+int merge_stage_t::buffer_head_t::has_tuple() {
+
+    tuple_t input;
+
+    int get_ret = buffer->get_tuple(input);
+    if (get_ret)
+        return get_ret;
+
+    // otherwise, we got a tuple
+    
     // copy the tuple to safe memory
     tuple.assign(input);
-
+    
     // update the head key
     item.key = cmp->make_key(tuple);
-    return true;
+    return 0;
 }
 
 
 
 /**
- * @brief Inserts an item into the list in ascending order
+ *  @brief Inserts an item into the list in ascending order.
  */
 void merge_stage_t::insert_sorted(buffer_head_t *head)
 {
@@ -95,41 +107,75 @@ void merge_stage_t::insert_sorted(buffer_head_t *head)
 
 stage_t::result_t merge_stage_t::process_packet() {
 
-    merge_packet_t *packet = (merge_packet_t *)_adaptor->get_packet();
-
     typedef merge_packet_t::buffer_list_t buffer_list_t;
+
+
+    merge_packet_t *packet = (merge_packet_t *)_adaptor->get_packet();
+    
 
     _comparator = packet->_comparator;
     buffer_list_t &inputs = packet->_input_buffers;
+
     
     // allocate an array of buffer heads
     int merge_factor = inputs.size();
-    TRACE(TRACE_DEBUG, "merge factor = %d\n", merge_factor);
     buffer_head_t head_array[merge_factor];
+    TRACE(TRACE_DEBUG, "Processing %d-way merge\n", merge_factor);
+
                              
     // get the input buffers and perform the initial sort
     for(int i=0; i < merge_factor; i++) {
         buffer_head_t &head = head_array[i];
-        if(head.init(inputs[i], _comparator))
+        switch (head.init(inputs[i], _comparator)) {
+        case 0:
             insert_sorted(&head);
+            continue;
+        case 1:
+            continue;
+        case -1:
+            // error!
+            return stage_t::RESULT_ERROR;
+        default:
+            // unrecognized value
+            QPIPE_PANIC();
+        }
     }
+
 
     // always output the smallest tuple
     for(int i=0; _head_list; i++) {
+
+
         // pop it off
         buffer_head_t *head = _head_list;
         _head_list = head->next;
+
 
         // output it
         result_t result = _adaptor->output(head->tuple);
 	if (result)
 	    return result;
-
+        
+        
         // put it back?
-        if(head->has_tuple())
+        switch (head->has_tuple()) {
+        case 0:
+            // run has a tuple
             insert_sorted(head);
+            continue;
+        case 1:
+            // run has no more tuples... do nothing
+            continue;
+        case -1:
+            // error!
+            return stage_t::RESULT_ERROR;
+        default:
+            // unrecognized value
+            QPIPE_PANIC();
+        }
     }
-
+    
+    
     // done!
     return stage_t::RESULT_STOP;
 }

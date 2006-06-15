@@ -11,10 +11,13 @@
 #include <algorithm>
 #include "stage_container.h"
 
-using namespace qpipe;
 
+
+using namespace qpipe;
 using std::vector;
 using std::pair;
+
+
 
 /**
  *  @brief Simulates a worker thread on the specified stage.
@@ -44,8 +47,7 @@ stage_t::result_t write_tuples(void* arg)
     tuple_t input((char *)&value, sizeof(int));
     for(input_list_t::iterator it=inputs.begin(); it != inputs.end(); ++it) {
         value = *it;
-        if(buffer->put_tuple(input))
-        {
+        if(buffer->put_tuple(input)) {
             TRACE(TRACE_ALWAYS, "buffer->put_tuple() returned non-zero!\n");
             TRACE(TRACE_ALWAYS, "Terminating loop...\n");
             break;
@@ -148,7 +150,7 @@ int main(int argc, char* argv[]) {
     merge_packet_t::buffer_list_t input_buffers;
     for(int i=0; i < merge_factor; i++) {
 
-        tuple_buffer_t  *input_buffer = new tuple_buffer_t(sizeof(int));
+        tuple_buffer_t *input_buffer = new tuple_buffer_t(sizeof(int));
         input_buffers.push_back(input_buffer);
         merge_info[i].first = input_buffer;
 
@@ -180,7 +182,7 @@ int main(int argc, char* argv[]) {
     
     
     // fire up the merge stage now
-    tuple_buffer_t output_buffer(sizeof(int));
+    tuple_buffer_t* output_buffer = new tuple_buffer_t(sizeof(int));
     int_tuple_comparator_t comparator;
 
     char* merge_packet_id;
@@ -190,7 +192,7 @@ int main(int argc, char* argv[]) {
 
     
     merge_packet_t* packet = new merge_packet_t(merge_packet_id,
-                                                &output_buffer,
+                                                output_buffer,
                                                 new tuple_filter_t(input_buffers[0]->tuple_size),
                                                 input_buffers,
                                                 &comparator);
@@ -198,10 +200,27 @@ int main(int argc, char* argv[]) {
     
    
     tuple_t output;
-    while(output_buffer.get_tuple(output)) {
-        if(do_echo)
-            TRACE(TRACE_ALWAYS, "Value: %d\n", *(int*)output.data);
+    while(1) {
+        int get_ret = output_buffer->get_tuple(output);
+        switch (get_ret) {
+
+        case 0:
+            if(do_echo)
+                TRACE(TRACE_ALWAYS, "Value: %d\n", *(int*)output.data);
+            continue;
+
+        case 1:
+            TRACE(TRACE_ALWAYS, "No more tuples...\n");
+            TRACE(TRACE_ALWAYS, "TEST DONE\n");
+            return 0;
+            
+        case -1:
+            TRACE(TRACE_ALWAYS, "get_tuple() error!\n");
+            QPIPE_PANIC();
+
+        default:
+            // unrecognized return value
+            QPIPE_PANIC();
+        }
     }
-    TRACE(TRACE_ALWAYS, "TEST DONE\n");
-    return 0;
 }

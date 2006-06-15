@@ -198,11 +198,11 @@ public:
 
         // FIXME: reversed on purpose to reduce selectivity...
 	if  ( tuple->L_SHIPDATE <= t ) {
-            //	    printf("+");
+            //TRACE(TRACE_ALWAYS, "+");
 	    return (true);
 	}
 	else {
-            //	    printf(".");
+            //TRACE(TRACE_ALWAYS, ".");
 	    return (false);
 	}
     }
@@ -484,39 +484,39 @@ int main() {
         
         // TSCAN PACKET
         // the output consists of 2 doubles
-	tuple_buffer_t tscan_out_buffer(sizeof(projected_lineitem_tuple));
+	tuple_buffer_t* tscan_out_buffer = new tuple_buffer_t(sizeof(projected_lineitem_tuple));
 
         char* tscan_packet_id;
         int tscan_packet_id_ret = asprintf(&tscan_packet_id, "Q1_TSCAN_PACKET");
         assert( tscan_packet_id_ret != -1 );
         tscan_packet_t* q1_tscan_packet = new tscan_packet_t(tscan_packet_id,
-                                                             &tscan_out_buffer,
+                                                             tscan_out_buffer,
                                                              new q1_tscan_filter_t(),
                                                              tpch_lineitem);
    
 	// SORT PACKET
 	// the output is always a single int
-        tuple_buffer_t sort_out_buffer(sizeof(projected_lineitem_tuple));
+        tuple_buffer_t* sort_out_buffer = new tuple_buffer_t(sizeof(projected_lineitem_tuple));
 
         char* sort_packet_id;
         int sort_packet_id_ret = asprintf(&sort_packet_id, "Q1_SORT_PACKET");
         assert( sort_packet_id_ret != -1 );
 	sort_packet_t* q1_sort_packet = new sort_packet_t(sort_packet_id,
-                                                          &sort_out_buffer,
-                                                          new tuple_filter_t(tscan_out_buffer.tuple_size),
-                                                          new q1_tuple_comparator_t,
+                                                          sort_out_buffer,
+                                                          new tuple_filter_t(tscan_out_buffer->tuple_size),
+                                                          new q1_tuple_comparator_t(),
                                                           q1_tscan_packet);
 
         // AGG PACKET CREATION
         // the output consists of 2 int
-        tuple_buffer_t  agg_output_buffer(sizeof(aggregate_tuple));
+        tuple_buffer_t* agg_output_buffer = new tuple_buffer_t(sizeof(aggregate_tuple));
 
         char* agg_packet_id;
         int agg_packet_id_ret = asprintf(&agg_packet_id, "Q1_AGG_PACKET");
         assert( agg_packet_id_ret != -1 );
         aggregate_packet_t* q1_agg_packet = new aggregate_packet_t(agg_packet_id,
-                                                                   &agg_output_buffer,
-                                                                   new tuple_filter_t(agg_output_buffer.tuple_size),
+                                                                   agg_output_buffer,
+                                                                   new tuple_filter_t(agg_output_buffer->tuple_size),
                                                                    new count_aggregate_t(),
                                                                    q1_sort_packet);
 
@@ -527,15 +527,14 @@ int main() {
         tuple_t output;
 	TRACE(TRACE_ALWAYS, "*** Q1 ANSWER ...\n");
 	TRACE(TRACE_ALWAYS, "*** SUM_QTY\tSUM_BASE\tSUM_DISC...\n");
-        while(agg_output_buffer.get_tuple(output)) {
+        while(!agg_output_buffer->get_tuple(output)) {
             aggregate_tuple *tuple;
             tuple = (aggregate_tuple *) output.data;
             TRACE(TRACE_ALWAYS, "*** %lf\t%lf\t%lf\n",
                   tuple->L_SUM_QTY, tuple->L_SUM_BASE_PRICE,
                   tuple->L_SUM_DISC_PRICE);
         }
-        
-        printf("Query executed in %lf ms\n", timer.time_ms());
+        TRACE(TRACE_ALWAYS, "Query executed in %lf ms\n", timer.time_ms());
     }
     try {    
 	// closes file and environment

@@ -72,6 +72,9 @@ packet_t::~packet_t(void) {
 	  _packet_type,
 	  _packet_id);
 
+    // output buffer should have already been dealt with
+    assert(_output_buffer == NULL);
+
     // we own our packet_id and our filter
     free(_packet_id);
 

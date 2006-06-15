@@ -163,28 +163,28 @@ int main(int argc, char* argv[]) {
     }
     
 
-    tuple_buffer_t  int_buffer(sizeof(int));
+    tuple_buffer_t* int_buffer = new tuple_buffer_t(sizeof(int));
     char* func_call_packet_id;
     int func_call_packet_id_ret =
         asprintf( &func_call_packet_id, "FUNC_CALL_PACKET_1" );
     assert( func_call_packet_id_ret != -1 );
     func_call_packet_t* fc_packet = 
 	new func_call_packet_t(func_call_packet_id,
-                               &int_buffer, 
+                               int_buffer, 
                                new tuple_filter_t(sizeof(int)), // unused, cannot be NULL
                                write_ints,
-                               &int_buffer);
+                               int_buffer);
 
 
     char* sort_packet_id;
     int sort_packet_id_ret = asprintf( &sort_packet_id, "SORT_PACKET_1" );
     assert( sort_packet_id_ret != -1 );
 
-    tuple_buffer_t  output_buffer(sizeof(int));
-    tuple_filter_t* output_filter = new tuple_filter_t(int_buffer.tuple_size);
+    tuple_buffer_t* output_buffer = new tuple_buffer_t(sizeof(int));
+    tuple_filter_t* output_filter = new tuple_filter_t(int_buffer->tuple_size);
     int_tuple_comparator_t* compare = new int_tuple_comparator_t;
     sort_packet_t* packet = new sort_packet_t(sort_packet_id,
-                                              &output_buffer,
+                                              output_buffer,
                                               output_filter,
                                               compare,
                                               fc_packet);
@@ -192,12 +192,29 @@ int main(int argc, char* argv[]) {
 
     
     tuple_t output;
-    while(output_buffer.get_tuple(output)) {
-	if (do_echo)
-	    TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
+
+
+    while(1) {
+        int get_ret = output_buffer->get_tuple(output);
+        switch (get_ret) {
+
+        case 0:
+            if(do_echo)
+                TRACE(TRACE_ALWAYS, "Value: %d\n", *(int*)output.data);
+            continue;
+
+        case 1:
+            TRACE(TRACE_ALWAYS, "No more tuples...\n");
+            TRACE(TRACE_ALWAYS, "TEST DONE\n");
+            return 0;
+            
+        case -1:
+            TRACE(TRACE_ALWAYS, "get_tuple() error!\n");
+            QPIPE_PANIC();
+
+        default:
+            // unrecognized return value
+            QPIPE_PANIC();
+        }
     }
-    TRACE(TRACE_ALWAYS, "TEST_DONE\n");
-
-
-    return 0;
 }

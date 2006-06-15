@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-    tuple_buffer_t  int_buffer(sizeof(int));
+    tuple_buffer_t* int_buffer = new tuple_buffer_t(sizeof(int));
     char* func_call_packet_id;
     int func_call_packet_id_ret =
         asprintf( &func_call_packet_id, "FUNC_CALL_PACKET_1" );
@@ -124,13 +124,13 @@ int main(int argc, char* argv[]) {
 
     func_call_packet_t* fc_packet = 
 	new func_call_packet_t(func_call_packet_id,
-                               &int_buffer, 
+                               int_buffer, 
                                new tuple_filter_t(sizeof(int)), // unused, cannot be NULL
                                write_ints,
-                               &int_buffer);
-
+                               int_buffer);
     
-    tuple_buffer_t count_buffer(sizeof(int));
+    
+    tuple_buffer_t* count_buffer = new tuple_buffer_t(sizeof(int));
 
 
     char* aggregate_packet_id;
@@ -140,14 +140,14 @@ int main(int argc, char* argv[]) {
  
     aggregate_packet_t* agg_packet =
         new aggregate_packet_t( aggregate_packet_id,
-                                &count_buffer,
+                                count_buffer,
                                 new tuple_filter_t(sizeof(int)),
                                 new count_aggregate_t(),
                                 fc_packet );
     dispatcher_t::dispatch_packet(agg_packet);
     
     tuple_t output;
-    while(count_buffer.get_tuple(output))
+    while(!count_buffer->get_tuple(output))
         TRACE(TRACE_ALWAYS, "Count: %d\n", *(int*)output.data);
     TRACE(TRACE_ALWAYS, "TEST DONE\n");
 

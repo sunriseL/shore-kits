@@ -31,21 +31,25 @@ protected:
 	
     protected:
 
-	// synch vars
+	// adaptor synch vars
 	pthread_mutex_t _stage_adaptor_lock;
 
 	stage_container_t* _container;
+
+        packet_t*      _packet;
         packet_list_t* _packet_list;
-	int _next_tuple;
+
+	int  _next_tuple;
         bool _still_accepting_packets;
 
+        // Group many output() tuples into a page before "sending"
+        // entire page to packet list
         page_guard_t out_page;
 	
 	// Checked independently of other variables. Don't need to
 	// protect this with _stage_adaptor_mutex.
 	volatile bool _cancelled;
 
-        packet_t* _packet;
 	
     public:
 
@@ -60,60 +64,92 @@ protected:
 	      _cancelled(false)
         {
 
+            assert( !packet_list->empty() );
+
 	    pthread_mutex_init_wrapper(&_stage_adaptor_lock, NULL);
 
             packet_list_t::iterator it;
 
-	    // terminate all inputs except one
+	    // We only need one packet to provide us with inputs. We
+	    // will make the first packet in the list a "primary"
+	    // packet. We can destroy the packet subtrees in the other
+	    // packets in the list since they will NEVER be used.
 	    it = packet_list->begin();
             _packet = *it;
-            while(++it != packet_list->end()) 
-                (*it)->terminate_inputs();
+            while(++it != packet_list->end()) {
+                packet_t* non_primary_packet = *it;
+                non_primary_packet->destroy_subpackets();
+            }
 
-	    // record next_tuple
+	    // Record next_tuple field in ALL packets, even the
+	    // primary.
 	    for (it = packet_list->begin(); it != packet_list->end(); ++it) {
-		(*it)->_stage_next_tuple_on_merge = 1;
+                packet_t* packet = *it;
+		packet->_stage_next_tuple_on_merge = 1;
 	    }
         }
         
+
+        ~stage_adaptor_t() {
+            // we should have deleted the primary packet
+            assert( _packet == NULL );
+            // we should have either deleted or handed off ownership
+            // of the packet list
+            assert( _packet_list == NULL );
+        }
+
+
 	virtual const char* get_container_name() {
 	    return _container->get_name();
 	}
+
 
         virtual packet_t* get_packet() {
             return _packet;
         }
 
+        
+        /**
+         *  @brief Thin wrapper that just invokes output_page.
+         *  Hopefully, this function will be inline and
+         *  the compiler can optimize across the call to
+         *  output_page, which is not virtual.
+         */
         virtual stage_t::result_t output(tuple_page_t *page) {
             return output_page(page);
         }
 	
+
 	virtual void stop_accepting_packets() {
 	    critical_section_t cs(&_stage_adaptor_lock);
 	    _still_accepting_packets = false;
 	}
 	
+
         virtual bool check_for_cancellation() {
             return _cancelled;
         }
 
-	bool try_merge(packet_t* packet);
 
+	bool try_merge(packet_t* packet);
 	void run_stage(stage_t* stage);
 
     protected:
 
-	void terminate_packet(packet_t* packet, int stage_done);
-
+	void finish_packet(packet_t* packet);
+        void cleanup();
         void abort_queries();
+
     private:
+
         stage_t::result_t output_page(tuple_page_t *page);
     };
     
-  
-    // synch vars
+    
+    // container synch vars
     pthread_mutex_t _container_lock;
     pthread_cond_t  _container_queue_nonempty;
+
 
     char*                   _container_name;
     list <packet_list_t*>   _container_queue;
@@ -124,12 +160,10 @@ protected:
 
     // container queue manipulation
     void container_queue_enqueue_no_merge(packet_list_t* packets);
-    void container_queue_enqueue(packet_t* packet);
+    void container_queue_enqueue_no_merge(packet_t* packet);
     packet_list_t* container_queue_dequeue();
-
-    stage_t::result_t output(packet_list_t* packets, const tuple_t &tuple);
-    void abort_query(packet_list_t* packets);
-
+    
+    
 public:
 
     stage_container_t(const char* container_name, stage_factory_t* stage_maker);

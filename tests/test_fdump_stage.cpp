@@ -47,7 +47,12 @@ void* write_tuples(void* arg)
 	}
     }
     
-    int_buffer->send_eof();
+    if ( !int_buffer->send_eof() ) {
+        // Consumer has already terminated this buffer! We are now
+        // responsible for deleting it.
+        TRACE(TRACE_ALWAYS, "Detected buffer termination\n");
+        delete int_buffer;
+    }
 
     return NULL;
 }
@@ -86,12 +91,12 @@ int main(int argc, char* argv[]) {
     
     
     // just need to pass one int at a time to the counter
-    tuple_buffer_t int_buffer(sizeof(int));
-    tuple_buffer_t signal_buffer(sizeof(int));
+    tuple_buffer_t* int_buffer = new tuple_buffer_t(sizeof(int));
+    tuple_buffer_t* signal_buffer = new tuple_buffer_t(sizeof(int));
 
 
     tester_thread_t* writer_thread =
-	new tester_thread_t(write_tuples, &int_buffer, "WRITER_THREAD");
+	new tester_thread_t(write_tuples, int_buffer, "WRITER_THREAD");
     
     if ( thread_create( NULL, writer_thread ) ) {
 	TRACE(TRACE_ALWAYS, "thread_create() failed\n");
@@ -111,9 +116,9 @@ int main(int argc, char* argv[]) {
 
     fdump_packet_t* packet = 
 	new fdump_packet_t(fdump_packet_id,
-			   &signal_buffer, 
-                           new tuple_filter_t(int_buffer.tuple_size),
-			   &int_buffer, 
+			   signal_buffer, 
+                           new tuple_filter_t(int_buffer->tuple_size),
+			   int_buffer, 
 			   fdump_packet_filename);
     
     
@@ -122,9 +127,9 @@ int main(int argc, char* argv[]) {
   
     tuple_t output;
     TRACE(TRACE_ALWAYS, "get_tuple() returned %d\n",
-	  signal_buffer.get_tuple(output) );
+	  signal_buffer->get_tuple(output) );
     TRACE(TRACE_ALWAYS, "TEST DONE\n");
-    
+    exit(0);
     
     return 0;
 }

@@ -33,17 +33,24 @@ public:
     } result_t;
 
 
+    /**
+     *  @brief The purpose of a stage::adaptor_t is to provide a
+     *  stage's process packet method with exactly the functionality
+     *  it needs to read from the primary packet and send results out
+     *  to every packet in the stage.
+     */
     struct adaptor_t {
+
     private:
+
         page_guard_t _page;
+
     public:
         
 	virtual const char* get_container_name()=0;
         virtual packet_t* get_packet()=0;
         virtual result_t output(tuple_page_t *page)=0;
-
 	virtual void stop_accepting_packets()=0;	
-
         virtual bool check_for_cancellation()=0;
         
         /**

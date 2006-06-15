@@ -7,6 +7,7 @@ LDADD = ../src/libqpipe.a $(BDB_HOME)/lib/libdb_cxx.a
 # define programs here
 bin_PROGRAMS = \
    test_trace \
+   test_tuple_buffer \
    test_fscan_stage \
    test_fdump_stage \
    lineitem_struct_sizes \
@@ -24,6 +25,7 @@ bin_PROGRAMS = \
 
 
 test_trace_SOURCES = test_trace.cpp
+test_tuple_buffer_SOURCES = test_tuple_buffer.cpp
 test_merge_stage_SOURCES = test_merge_stage.cpp
 test_sort_stage_SOURCES = test_sort_stage.cpp
 test_fdump_stage_SOURCES = test_fdump_stage.cpp

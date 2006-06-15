@@ -21,8 +21,10 @@
 
 
 
-// exported datatypes
-
+/**
+ *  @brief QPIPE thread base class. Basically a thin wrapper around an
+ *  internal method and a thread name.
+ */
 class thread_t {
 
 private:
@@ -44,9 +46,11 @@ protected:
 };
 
 
+
 /**
- * @brief wraps up a class instance and a member function to look like
- * a thread_t. Use the convenience function below to instantiate
+ *  @brief wraps up a class instance and a member function to look
+ *  like a thread_t. Use the convenience function below to
+ *  instantiate.
  */
 template <class Class, class Functor>
 class member_func_thread_t : public thread_t {
@@ -64,6 +68,46 @@ public:
         return _func(_instance);
     }
 };
+
+
+
+// exported functions
+
+void  thread_init(void);
+const char* thread_get_self_name(void);
+int   thread_create(pthread_t* thread, thread_t* t);
+
+void pthread_mutex_init_wrapper(pthread_mutex_t* mutex,
+				const pthread_mutexattr_t* attr);
+void pthread_mutex_lock_wrapper(pthread_mutex_t* mutex);
+void pthread_mutex_unlock_wrapper(pthread_mutex_t* mutex);
+void pthread_mutex_destroy_wrapper(pthread_mutex_t* mutex);
+
+
+void pthread_cond_init_wrapper(pthread_cond_t* cond,
+			       const pthread_condattr_t* attr);
+void pthread_cond_destroy_wrapper(pthread_cond_t* cond);
+void pthread_cond_signal_wrapper(pthread_cond_t* cond);
+void pthread_cond_wait_wrapper(pthread_cond_t* cond,
+			       pthread_mutex_t* mutex);
+
+template <class T>
+void pthread_join_wrapper(pthread_t tid, T* &rval) {
+    // the union keeps gcc happy about the "type-punned" pointer
+    // access going on here. Otherwise, -O3 could break the code.
+    union {
+        void *p;
+        T *v;
+    } u;
+    if(pthread_join(tid, &u.p)) {
+        TRACE(TRACE_ALWAYS, "pthread_join() failed");
+        QPIPE_PANIC();
+    }
+
+    rval = u.v;
+}
+
+
 
 /**
  * @brief Helper function for running class member functions in a
@@ -85,55 +129,11 @@ thread_t *member_func_thread(Class *instance, Return (Class::*mem_func)(),
     return thread;
 }
 
-// exported functions
 
-void  thread_init(void);
-const char* thread_get_self_name(void);
-int   thread_create(pthread_t* thread, thread_t* t);
-
-
-void pthread_mutex_init_wrapper(pthread_mutex_t* mutex,
-				const pthread_mutexattr_t* attr);
-
-void pthread_mutex_lock_wrapper(pthread_mutex_t* mutex);
-
-void pthread_mutex_unlock_wrapper(pthread_mutex_t* mutex);
-
-void pthread_mutex_destroy_wrapper(pthread_mutex_t* mutex);
-
-
-void pthread_cond_init_wrapper(pthread_cond_t* cond,
-			       const pthread_condattr_t* attr);
-
-void pthread_cond_destroy_wrapper(pthread_cond_t* cond);
-
-void pthread_cond_signal_wrapper(pthread_cond_t* cond);
-
-void pthread_cond_wait_wrapper(pthread_cond_t* cond,
-			       pthread_mutex_t* mutex);
-
-
-template <class T>
-void pthread_join_wrapper(pthread_t tid, T* &rval) {
-    // the union keeps gcc happy about the "type-punned" pointer
-    // access going on here. Otherwise, -O3 could break the code.
-    union {
-        void *p;
-        T *v;
-    } u;
-    if(pthread_join(tid, &u.p)) {
-        TRACE(TRACE_ALWAYS, "pthread_join() failed");
-        QPIPE_PANIC();
-    }
-
-    rval = u.v;
-}
 
 /**
- * @brief A critical section manager.
- *
- * Locks and unlocks the specified mutex upon construction and
- * destruction respectively. 
+ *  @brief A critical section manager. Locks and unlocks the specified
+ *  mutex upon construction and destruction respectively.
  */
 
 struct critical_section_t {
@@ -155,6 +155,8 @@ struct critical_section_t {
         exit();
     }
 };
+
+
 
 /**
  * @brief A simple "notifier" that allows a thread to block on pending
@@ -235,5 +237,10 @@ protected:
     }
 };
 
+
+
 #include "namespace.h"
+
+
+
 #endif  /* __THREAD_H */

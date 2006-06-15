@@ -98,24 +98,32 @@ public:
         _input->destroy_subpackets();
         delete _input;
         _input = NULL;
-    }    
+    }
     
     
     virtual void terminate_inputs() {
 
-	// TODO detect close() error and delete input_buffer
-	_input_buffer->close();
+        // input buffer
+        if ( !_input_buffer->terminate() ) {
+            // Producer has already terminated this buffer! We are now
+            // responsible for deleting it.
+            delete _input_buffer;
+        }
         _input_buffer = NULL;
+
 
         // TODO Ask the dispatcher to clear our input packet (_input)
         // from system, if it still exists.
-
         
         // Now that we know _input is not in the system, remove our
         // reference to it.
         _input = NULL;
-    }
 
+
+        // TODO destroy any other packets we may have dispatched
+        // during our execution
+    }
+    
 };
 
 

@@ -85,8 +85,12 @@ struct merge_packet_t : public packet_t {
 
             tuple_buffer_t* _input_buffer = *it;
 
-            // TODO detect close() error and delete input_buffer
-            _input_buffer->close();
+            // terminate current input buffer
+            if ( !_input_buffer->terminate() ) {
+                // Producer has already terminated this buffer! We are now
+                // responsible for deleting it.
+                delete _input_buffer;
+            }
 
             it = _input_buffers.erase(it);
         }
@@ -114,7 +118,7 @@ private:
         key_tuple_pair_t item;
         buffer_head_t() { }
         bool init(tuple_buffer_t *buf, tuple_comparator_t *c);
-        bool has_tuple();
+        int has_tuple();
     };
     
     buffer_head_t *_head_list;

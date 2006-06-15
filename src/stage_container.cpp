@@ -19,6 +19,9 @@
 
 
 
+
+// container methods
+
 /**
  *  @brief Stage constructor.
  *
@@ -26,7 +29,6 @@
  *  printing debug information. The constructor will create a copy of
  *  this string, so the caller should deallocate it if necessary.
  */
-
 stage_container_t::stage_container_t(const char* container_name,
 				     stage_factory_t* stage_maker)
     : _stage_maker(stage_maker)
@@ -55,7 +57,6 @@ stage_container_t::stage_container_t(const char* container_name,
  *  are in the system. We will delete every entry of the container
  *  queue.
  */
-
 stage_container_t::~stage_container_t(void) {
 
     // the container owns its name
@@ -89,7 +90,7 @@ void stage_container_t::container_queue_enqueue_no_merge(packet_list_t* packets)
  *
  *  THE CALLER MUST BE HOLDING THE _container_lock MUTEX.
  */
-void stage_container_t::container_queue_enqueue(packet_t* packet) {
+void stage_container_t::container_queue_enqueue_no_merge(packet_t* packet) {
     packet_list_t* packets = new packet_list_t();
     packets->push_back(packet);
     container_queue_enqueue_no_merge(packets);
@@ -104,7 +105,6 @@ void stage_container_t::container_queue_enqueue(packet_t* packet) {
  *
  *  THE CALLER MUST BE HOLDING THE stage_lock MUTEX.
  */
-
 packet_list_t* stage_container_t::container_queue_dequeue() {
 
     // wait for a packet to appear
@@ -119,77 +119,23 @@ packet_list_t* stage_container_t::container_queue_dequeue() {
     return plist;
 }
 
+
+
 /**
- * @brief Outputs a page of tuples. The caller retains ownership of the page.
+ *  @brief Send the specified packet to this container. We will try to
+ *  merge the packet into a running stage or into an already enqueued
+ *  packet packet list. If we fail, we will wrap the packet in a
+ *  packet_list_t and insert the list as a new entry in the container
+ *  queue.
+ *
+ *  Merging will fail if the packet is already marked as non-mergeable
+ *  (if its is_merge_enabled() method returns false). It will also
+ *  fail if there are no "similar" packets (1) currently being
+ *  processed by any stage AND (2) currently enqueued in the container
+ *  queue.
+ *
+ *  @param packet The packet to send to this stage.
  */
-stage_t::result_t stage_container_t::stage_adaptor_t::output_page(tuple_page_t *page) {
-    packet_list_t::iterator it, end;
-    unsigned int next_tuple;
-    
-
-    critical_section_t cs(&_stage_adaptor_lock);
-    it  = _packet_list->begin();
-    end = _packet_list->end();
-    _next_tuple += page->tuple_count();
-    next_tuple = _next_tuple;
-    cs.exit();
-
-    
-    // Any new packets which merge after this point will not 
-    // receive this page.
-    
-
-    bool packets_remaining = false;
-    tuple_t out_tup;
-
-    while (it != end) {
-	
-        packet_t* packet = *it;
-        bool terminate = false;
-
-        // drain this page into the packet's output buffer
-        tuple_page_t::iterator page_it = page->begin();
-        for( ; page_it != page->end(); ++page_it) {
-            
-            // was this tuple selected?
-            if(packet->_output_filter->select(*page_it)) {
-                if ( packet->_output_buffer->alloc_tuple(out_tup) ) {
-                    // alloc_tuple() failed!
-                    terminate = true;
-                    break;
-                }
-
-                // send tuple
-                packet->_output_filter->project(out_tup, *page_it);
-            }
-        }
-
-
-        // check for completed packets
-        if ( next_tuple == packet->_stage_next_tuple_needed ) {
-            // this packet has received all data it needs!
-            terminate = true;
-        }
-        
-	// continue to next merged packet
-        if(terminate) {
-            terminate_packet(packet, 0);
-            it = _packet_list->erase(it);
-        }
-        else
-            ++it;
-        
-	packets_remaining = true;
-    }
-    
-    
-    if ( packets_remaining )
-	return stage_t::RESULT_CONTINUE;
-    return stage_t::RESULT_STOP;
-}
-
-
-
 void stage_container_t::enqueue(packet_t* packet) {
 
 
@@ -203,7 +149,7 @@ void stage_container_t::enqueue(packet_t* packet) {
     // check for non-mergeable packets
     if ( !packet->is_merge_enabled() )  {
 	// We are forcing the new packet to not merge with others.
-	container_queue_enqueue(packet);
+	container_queue_enqueue_no_merge(packet);
 	return; 
 	// * * * END CRITICAL SECTION * * *
     }
@@ -252,180 +198,17 @@ void stage_container_t::enqueue(packet_t* packet) {
 
     // No work sharing detected. We can now give up and insert the new
     // packet into the stage_queue.
-    container_queue_enqueue(packet);
+    container_queue_enqueue_no_merge(packet);
     // * * * END CRITICAL SECTION * * *
 };
 
 
 
 /**
- *  @brief Try to merge the specified packet into this stage. This
- *  function assumes that packet has its mergeable flag set to
- *  true.
- *
- *  This method relies on the stage's current state (whether
- *  _stage_accepting_packets is true) as well as the
- *  is_mergeable() method used to compare two packets.
- *
- *  @param packet The packet to try and merge.
- *
- *  @return true if the merge was successful. false otherwise.
+ *  @brief Worker threads for this stage should invoke this
+ *  function. It will return when the stage shuts down.
  */
-bool stage_container_t::stage_adaptor_t::try_merge(packet_t* packet) {
- 
-   // * * * BEGIN CRITICAL SECTION * * *
-    critical_section_t cs(&_stage_adaptor_lock);
-
-
-    if ( !_still_accepting_packets ) {
-	// stage not longer in a state where it can accept new packets
-	return false;
-	// * * * END CRITICAL SECTION * * *	
-    }
-    
-
-    // The _still_accepting_packets flag cannot change since we are
-    // holding the _stage_adaptor_lock. We can also safely access
-    // _packet for the same reason.
-    if ( !_packet->is_mergeable(packet) ) {
-	// packet cannot share work with this stage
-	return false;
-	// * * * END CRITICAL SECTION * * *
-    }
-
-
-    // if we are here, we detected work sharing!
-    _packet_list->push_front(packet);
-    packet->_stage_next_tuple_on_merge = _next_tuple;
-    if ( _next_tuple == 1 ) {
-	// Stage has not produced any results yet. Safe to terminate
-	// our own inputs.
-	packet->terminate_inputs();
-    }
-
-
-    // * * * END CRITICAL SECTION * * *
-    return true;
-}
-
-
-
-void stage_container_t::stage_adaptor_t::terminate_packet(packet_t* packet, int stage_done) {
-
-    // TODO check for error and delete output_buffer
-    packet->_output_buffer->send_eof();
-    
-
-    if ( !stage_done && (packet == _packet) ) {
-	// primary packet... cannot close inputs until the stage is
-	// done.
-	return;
-    }
-    
-
-    // If we are not the primary, we can simply progate shutdown to
-    // children (just need to delete their subtrees and packet state).
-    packet->terminate_inputs();
-    delete packet;
-}
-
-
-
-void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
-
-    assert( stage != NULL );
-    stage->init(this);
-    int process_ret = stage->process();
-    stop_accepting_packets();
-
-    // flush any partial page
-    if(process_ret == stage_t::RESULT_STOP) {
-        process_ret = flush();
-        if(process_ret == stage_t::RESULT_CONTINUE)
-            process_ret = stage_t::RESULT_STOP;
-    }
-    
-    switch(process_ret) {
-    case stage_t::RESULT_STOP:
-        break;
-        
-    case stage_t::RESULT_ERROR:
-	TRACE(TRACE_ALWAYS, "process_packet() returned error. Aborting queries...\n");
-	abort_queries();
-	assert (_packet_list->empty());
-	delete _packet_list;
-	return;
-        
-    default:
-        TRACE(TRACE_ALWAYS, "process_packet() returned an invalid result %d\n",
-	      process_ret);
-        QPIPE_PANIC();
-    }
-
-    // Walk through _stage_packets and re-enqueue the packets which
-    // have not yet completed. We should try to avoid going to the
-    // dispatcher again. We can change this later if there is a
-    // compelling reason to.
-    packet_list_t::iterator it;
-    for (it = _packet_list->begin(); it != _packet_list->end(); ) {
-	    
-	// remove packet from list
-	packet_t* packet = *it;
-	    
-	    
-	// If packet is finished...
-	if ( packet->_stage_next_tuple_on_merge == 1 ) {
-	    it = _packet_list->erase(it);
-	    terminate_packet(packet, 1);
-	    continue;
-	}
-
-	    
-	// otherwise, simply update what this packet needs
-	packet->_stage_next_tuple_needed =
-	    packet->_stage_next_tuple_on_merge;
-	packet->_stage_next_tuple_on_merge = 0; // reinitialize
-    }
-
-    // re-enqueue incomplete packets if we have them
-    if ( _packet_list->empty() )
-	delete _packet_list;
-    else
-	_container->container_queue_enqueue_no_merge(_packet_list);
-}
-
-
-
-void stage_container_t::stage_adaptor_t::abort_queries() {
-
-
-    // process_packet() succeeded!
-    stop_accepting_packets();
-    
-
-    // Walk through _stage_packets and re-enqueue the packets which
-    // have not yet completed. We should try to avoid going to the
-    // dispatcher again. We can change this later if there is a
-    // compelling reason to.
-    packet_list_t::iterator it;
-    for (it = _packet_list->begin(); it != _packet_list->end(); ) {
-	    
-	// remove packet from list
-	packet_t* packet = *it;
-
-	// If packet is finished...
-	it = _packet_list->erase(it);
-	
-	// TODO need to invoke packet->client_buffer->terminate();
-	
-	terminate_packet(packet, 1);
-    }
-}
-
-
-
 void stage_container_t::run() {
-
 
     while (1) {
 	
@@ -450,6 +233,387 @@ void stage_container_t::run() {
 
 	// TODO: check for container shutdown
     }
+}
+
+
+
+
+// stage adaptor methods
+
+/**
+ *  @brief Try to merge the specified packet into this stage. This
+ *  function assumes that packet has its mergeable flag set to
+ *  true.
+ *
+ *  This method relies on the stage's current state (whether
+ *  _stage_accepting_packets is true) as well as the
+ *  is_mergeable() method used to compare two packets.
+ *
+ *  @param packet The packet to try and merge.
+ *
+ *  @return true if the merge was successful. false otherwise.
+ */
+bool stage_container_t::stage_adaptor_t::try_merge(packet_t* packet) {
+ 
+    // * * * BEGIN CRITICAL SECTION * * *
+    critical_section_t cs(&_stage_adaptor_lock);
+
+
+    if ( !_still_accepting_packets ) {
+	// stage not longer in a state where it can accept new packets
+	return false;
+	// * * * END CRITICAL SECTION * * *	
+    }
+
+    // The _still_accepting_packets flag cannot change since we are
+    // holding the _stage_adaptor_lock. We can also safely access
+    // _packet for the same reason.
+ 
+
+    // Mergeability is an equality relation. We can check whether
+    // packet is similar to the packets in this stage by simply
+    // comparing it with the stage's primary packet.
+    if ( !_packet->is_mergeable(packet) ) {
+	// packet cannot share work with this stage
+	return false;
+	// * * * END CRITICAL SECTION * * *
+    }
+    
+    
+    // If we are here, we detected work sharing!
+    _packet_list->push_front(packet);
+    packet->_stage_next_tuple_on_merge = _next_tuple;
+    if ( _next_tuple == 1 ) {
+	// Stage has not produced any results yet. No difference
+	// between (1) merging the packet now and (2) if the packet
+	// had been with this stage's packet list from the beginning.
+	packet->destroy_subpackets();
+    }
+    // else: Need to keep the packet's subtree alive until the stage
+    // is done. At that point, we need to combine the unfinished
+    // packets and resubmit them. We may end up choosing this packet
+    // as the primary for that packet set.
+    
+
+    // * * * END CRITICAL SECTION * * *
+    return true;
+}
+
+
+
+/**
+ *  @brief Outputs a page of tuples to this stage's packet set. The
+ *  caller retains ownership of the page.
+ */
+stage_t::result_t stage_container_t::stage_adaptor_t::output_page(tuple_page_t *page) {
+
+    packet_list_t::iterator it, end;
+    unsigned int next_tuple;
+    
+    
+    critical_section_t cs(&_stage_adaptor_lock);
+    it  = _packet_list->begin();
+    end = _packet_list->end();
+    _next_tuple += page->tuple_count();
+    next_tuple = _next_tuple;
+    cs.exit();
+
+    
+    // Any new packets which merge after this point will not 
+    // receive this page.
+    
+
+    bool packets_remaining = false;
+    tuple_t out_tup;
+
+    while (it != end) {
+
+
+        packet_t* curr_packet = *it;
+        bool terminate_curr_packet = false;
+
+
+        // Drain all tuples in output page into the current packet's
+        // output buffer.
+        tuple_page_t::iterator page_it;
+        for( page_it = page->begin();  page_it != page->end(); ++page_it) {
+
+            // apply current packet's filter to this tuple
+            if(curr_packet->_output_filter->select(*page_it)) {
+
+                // this tuple selected by filter!
+
+                // allocate space in the output buffer
+                if ( curr_packet->_output_buffer->alloc_tuple(out_tup) ) {
+                    // The consumer of the current packet's output
+                    // buffer has terminated the buffer! No need to
+                    // continue iterating over output page.
+                    terminate_curr_packet = true;
+                    break;
+                }
+        
+                // write tuple to allocated space
+                curr_packet->_output_filter->project(out_tup, *page_it);
+            }
+        }
+        
+        
+        // If this packet has run more than once, it may have received
+        // all the tuples it needs. Check for this case.
+        if ( next_tuple == curr_packet->_stage_next_tuple_needed )
+            // This packet has received all tuples it needs! Another
+            // reason to terminate this packet!
+            terminate_curr_packet = true;
+        
+
+        // check for packet termination
+        if (terminate_curr_packet) {
+            // Finishing up a stage packet is tricky. We must treat
+            // terminating the primary packet as a special case. The
+            // good news is that the finish_packet() method handle all
+            // special cases for us.
+            finish_packet(curr_packet);
+            it = _packet_list->erase(it);
+            continue;
+        }
+ 
+
+        ++it;
+        packets_remaining = true;
+    }
+    
+    
+    if ( packets_remaining )
+        // still have packets that need tuples
+	return stage_t::RESULT_CONTINUE;
+    return stage_t::RESULT_STOP;
+}
+
+
+
+/**
+ *  @brief Send EOF to the packet's output buffer. Delete the buffer
+ *  if the consumer has already terminated it. If packet is not the
+ *  primary packet for this stage, destroy its subpackets and delete
+ *  it.
+ *
+ *  @param packet The packet to terminate.
+ */
+void stage_container_t::stage_adaptor_t::finish_packet(packet_t* packet) {
+
+    
+    // packet output buffer
+    tuple_buffer_t* output_buffer = packet->_output_buffer;
+    if ( !output_buffer->send_eof() ) {
+        // Consumer has already terminated this buffer! We are now
+        // responsible for deleting it.
+        delete output_buffer;
+    }
+    // The producer should perform no other operations with this
+    // buffer. Setting the output buffer to NULL helps catch
+    // programming errors as well as detect when the primary packet's
+    // output buffer has been already closed.
+    packet->_output_buffer = NULL;
+   
+
+    // packet input buffer(s)
+    if ( packet == _packet ) {
+        // Trying to terminate this stage's primary
+        // packet. Terminating the output buffer was ok, but we cannot
+        // yet terminate the inputs because other packets in the stage
+        // may still be reading them.
+        return;
+    }
+    else {
+        // since we are not the primary, can happily destroy packet
+        // subtrees
+        packet->destroy_subpackets();
+        delete packet;
+    }
+}
+
+
+
+/**
+ *  @brief When a worker thread dequeues a new packet list from the
+ *  container queue, it should create a stage_adaptor_t around that
+ *  list, create a stage to work with, and invoke this method with the
+ *  stage. This function invokes the stage's process() method with
+ *  itself and "cleans up" the stage's packet list when process()
+ *  returns.
+ *
+ *  @param stage The stage providing us with a process().
+ */
+void stage_container_t::stage_adaptor_t::run_stage(stage_t* stage) {
+
+
+    // error checking
+    assert( stage != NULL );
+
+    
+    // run stage-specific processing function
+    stage->init(this);
+    stage_t::result_t process_ret = stage->process();
+
+
+    // if we are still accepting packets, stop now
+    stop_accepting_packets();
+
+    TRACE(TRACE_DEBUG, "process returned %d\n", process_ret);
+    
+    switch(process_ret) {
+
+    case stage_t::RESULT_STOP:
+        
+        // flush remaining tuples
+        if ( flush() == stage_t::RESULT_ERROR ) {
+            TRACE(TRACE_ALWAYS, "flush() returned error. Aborting queries...\n");
+            abort_queries();
+            return;
+        }
+
+        // done!
+        cleanup();
+        return;
+        
+    case stage_t::RESULT_ERROR:
+	TRACE(TRACE_ALWAYS, "process() returned error. Aborting queries...\n");
+        abort_queries();
+        return;
+
+    default:
+        TRACE(TRACE_ALWAYS, "process() returned an invalid result %d\n",
+	      process_ret);
+        QPIPE_PANIC();
+    }
+}
+
+
+
+/**
+ *  @brief Cleanup after successful processing of a stage.
+ *
+ *  Walk through packet list. Invoke finish_packet() on packets that
+ *  merged when _next_tuple == 1. Erase these packets from the packet
+ *  list.
+ *
+ *  Take the remain packet list (of "unfinished" packets) and
+ *  re-enqueue it.
+ *
+ *  Invoke terminate_inputs() on the primary packet and delete it.
+ */
+void stage_container_t::stage_adaptor_t::cleanup() {
+
+
+    // walk through our packet list
+    packet_list_t::iterator it;
+    for (it = _packet_list->begin(); it != _packet_list->end(); ) {
+        
+	packet_t* curr_packet = *it;
+
+        // Check for all packets that have been with this stage from
+        // the beginning. If we haven't invoked finish_packet() on the
+        // primary yet, we're going to do it now.
+        if ( curr_packet->_stage_next_tuple_on_merge == 1 ) {
+
+            // The packet is finished. If it is not the primary
+            // packet, finish_packet() will delete it.
+            finish_packet(curr_packet);
+
+            it = _packet_list->erase(it);
+            continue;
+        }
+        
+        // The packet is not finished. Simply update its progress
+        // counter(s).
+        curr_packet->_stage_next_tuple_needed =
+            curr_packet->_stage_next_tuple_on_merge;
+        curr_packet->_stage_next_tuple_on_merge = 0; // reinitialize
+    }
+
+
+    // Re-enqueue incomplete packets if we have them
+    if ( _packet_list->empty() ) {
+	delete _packet_list;
+    }
+    else {
+        // Hand off ownership of the packet list back to the
+        // container.
+	_container->container_queue_enqueue_no_merge(_packet_list);
+    }
+    _packet_list = NULL;
+
+    
+    // Terminate inputs of primary packet. finish_packet() already
+    // took care of its output buffer.
+    assert(_packet != NULL);
+    _packet->terminate_inputs();
+    delete _packet;
+    _packet = NULL;
+}
+
+
+
+/**
+ *  @brief Cleanup after unsuccessful processing of a stage.
+ *
+ *  Walk through packet list. For each non-primary packet, invoke
+ *  terminate() on its output buffer, invoke destroy_subpackets() to
+ *  destroy its inputs, and delete the packet.
+ *
+ *  Invoke terminate() on the primary packet's output buffer, invoke
+ *  terminate_inputs() to terminate its input buffers, and delete it.
+ */
+void stage_container_t::stage_adaptor_t::abort_queries() {
+
+
+    // handle non-primary packets in packet list
+    packet_list_t::iterator it;
+    for (it = _packet_list->begin(); it != _packet_list->end(); ) {
+        
+
+	packet_t* curr_packet = *it;
+
+
+        if ( curr_packet != _packet ) {
+            // packet is non-primary
+
+            // output
+            if ( !curr_packet->_output_buffer->terminate() ) {
+                // Consumer has already terminated this buffer! We are
+                // now responsible for deleting it.
+                delete curr_packet->_output_buffer;
+            }
+
+            // input(s)
+            curr_packet->destroy_subpackets();
+            delete curr_packet;
+        }
+    }
+
+    
+    // handle primary packet
+
+    // output
+    
+    //If the primary packet has been finished, its output
+    // buffer will be set to NULL. If this is the case, there is no
+    // reason to invoke terminate() on it.
+    if ( _packet->_output_buffer != NULL ) {
+        if ( !_packet->_output_buffer->terminate() ) {
+            // Consumer has already terminated this buffer! We are
+            // now responsible for deleting it.
+            delete _packet->_output_buffer;
+        }
+    }
+
+
+    // input(s)
+    
+    // Terminate inputs of primary packet. finish_packet() already
+    // took care of its output buffer.
+    _packet->terminate_inputs();
+    delete _packet;
 }
 
 

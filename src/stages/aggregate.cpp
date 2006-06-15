@@ -29,22 +29,43 @@ stage_t::result_t aggregate_stage_t::process_packet() {
     dispatcher_t::dispatch_packet(packet->_input);
 
 
-    // input buffer owns src
-    tuple_t src;
-
-
     // "I" own dest, so allocate space for it on the stack
     size_t dest_size = packet->_output_buffer->tuple_size;
     char dest_data[dest_size];
     tuple_t dest(dest_data, dest_size);
 
 
-    while(input_buffer->get_tuple(src)) {
-	if ( aggregate->aggregate(dest, src) ) {
-	    result_t output_ret = adaptor->output(dest);
-	    if (output_ret)
-		return output_ret;
-	}
+    bool running = true;
+    while (running) {
+
+        tuple_t src;
+        switch (input_buffer->get_tuple(src)) {
+            
+        case 0:
+            // got another tuple
+            if ( aggregate->aggregate(dest, src) ) {
+                result_t output_ret = adaptor->output(dest);
+                if (output_ret)
+                    return output_ret;
+            }
+            continue;
+                
+        case 1:
+            // No more tuples! Exit from loop, but can't return quite
+            // yet since we may still have one more aggregation to
+            // perform.
+            running = false;
+            break;
+
+        case -1:
+            // producer has terminated buffer!
+            TRACE(TRACE_DEBUG, "Detected input buffer termination. Halting aggregation\n");
+            return stage_t::RESULT_ERROR;
+            
+        default:
+            // unrecognized return value
+            QPIPE_PANIC();
+        }
     }
 
     

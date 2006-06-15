@@ -66,7 +66,6 @@ public:
         init(data, size);
     }
 
-
     /**
      *  @brief Copy the specified tuple. This function performs a deep
      *  copy (copy of data bytes) from the src tuple to this
@@ -327,7 +326,7 @@ public:
      *  @return 0 if a page was successfully read. 1 if there thare no
      *  more pages to read. -1 on error.
      */
-
+    
     int fread_full_page(FILE *file) {
 
 	size_t size = page_size();
@@ -518,8 +517,10 @@ protected:
 };
 
 
+
 /**
- * @brief Ensures that a page allocated with malloc+placement-new gets freed
+ *  @brief Ensures that a page allocated with malloc+placement-new
+ *  gets freed.
  */
 struct page_guard_t : public pointer_guard_base_t<tuple_page_t, page_guard_t> {
     page_guard_t(tuple_page_t *ptr=NULL)
@@ -559,10 +560,6 @@ private:
     page_buffer_t page_buffer;
     size_t _page_size;
     
-    pthread_mutex_t init_lock;
-    pthread_cond_t  init_notify;
-    volatile bool initialized;
-
     int lastTransmit;
     int sample;
 
@@ -584,29 +581,30 @@ public:
 
 
     /**
-     *  @brief Insert a tuple into this buffer. If the buffer is full
-     *  (if it already has allocated the maximum number of pages),
-     *  wait for the consumer to read. If the current page is filled
-     *  and the buffer is not full, allocate a new page.
+     *  @brief This function can only be called by the
+     *  producer. Insert a tuple into this buffer. If the buffer is
+     *  full (if it already has allocated the maximum number of
+     *  pages), wait for the consumer to read. If the current page is
+     *  filled and the buffer is not full, allocate a new page.
      *
      *  @param tuple The tuple to insert. On successful insert, the
      *  data that this tuple points to will be copied into this page.
      *
      *  @return 0 on successful insert. Non-zero if the buffer was
-     *  closed by the consumer.
+     *  terminated by the consumer.
      */
 
     int put_tuple (const tuple_t &tuple) {
-
-        if(check_page_full())
-            return 1;
-
+        if( check_page_full() )
+            // buffer was closed by consumer!
+            return -1;
         return !write_page->append_init(tuple);
     }
 
 
     /**
-     *  @brief Insert a page of tuples to the buffer in one
+     *  @brief This function can only be called by the
+     *  producer. Insert a page of tuples into the buffer in one
      *  operation. The buffer assumes ownership of the page and is now
      *  responsible for destroying it. This function will block if the
      *  tuple_buffer_t already contains the maximum number of pages.
@@ -618,18 +616,20 @@ public:
      *  @param page The page of tuples to insert.
      * 
      *  @return 0 on successful insert. Non-zero if the buffer was
-     *  closed by the consumer.
+     *  terminated by the consumer.
      */
 
-    int put_page(tuple_page_t *page) {
+    int put_page(tuple_page_t* page) {
         return page_buffer.write(page);
     }
 
     
     /**
-     *  @brief Allocate space for a new tuple in this buffer and set
-     *  'tuple' to point to it. The tuple buffer specifies the size to
-     *  allocate. This function blocks if the buffer is full.
+     *  @brief This function can only be called by the
+     *  producer. Allocate space for a new tuple in this buffer and
+     *  set 'tuple' to point to it. The tuple size stored in the
+     *  buffer must match the size of 'tuple'. This function blocks if
+     *  the buffer is full.
      *
      *  If this function returns success, the caller may invoke
      *  tuple.assign() to copy data into the allocated space. This
@@ -638,25 +638,23 @@ public:
      *  consumer of this buffer.
      *
      *  @return 0 on successful allocate. Non-zero if the consumer has
-     *  closed the buffer.
+     *  terminated the buffer.
      */
 
     int alloc_tuple(tuple_t &tuple) {
-        
-	// TODO Deal will allocation problems...
-	
 	if ( check_page_full() )
-	    return 1;
-
+            // buffer was closed!
+	    return -1;
         return !write_page->append_mount(tuple);
     };
   
     
-    bool get_tuple(tuple_t &tuple);
+    int get_tuple(tuple_t &tuple);
 
 
     /**
-     *  @brief Retrieve a page of tuples from the buffer in one
+     *  @brief This function can only be called by the
+     *  consumer. Retrieve a page of tuples from the buffer in one
      *  operation. The buffer gives up ownership of the page and will
      *  not access (or free) it afterward.
      *
@@ -665,20 +663,26 @@ public:
      *  words, the caller must be willing to process some unknown
      *  number of tuples twice.
      *
-     *  @return NULL on error (if the buffer is empty and the producer
-     *  has closed the buffer). Otherwise, a page of tuples (some of
-     *  which may have been returned previously by calls to
-     *  get_tuple()).
+     *  @param pagep If a page is retrieved, it is assigned to this
+     *  tuple_page_t pointer. If the caller is mixing calls to
+     *  get_page() and get_tuple(), some of the tuples on the returned
+     *  page may have been returned by previous calls to get_tuple()).
+     *
+     *  @return 0 if a page is removed from the buffer. 1 if the
+     *  buffer is empty and the producer has invoked send_eof() on the
+     *  buffer. -1 if the buffer has been terminated.
      */
 
-    tuple_page_t *get_page() {
+    int get_page(tuple_page_t*& pagep) {
 
         // make sure there's a valid page
-	if(wait_for_input())
-            return NULL;
+        int wait_ret = wait_for_input();
+        if (wait_ret)
+            return wait_ret;
 
         // steal the page (invalidate the tuple iterator)
-        return read_page.release();
+        pagep = read_page.release();
+        return 0;
     }
 
 
@@ -686,29 +690,45 @@ public:
 
     
     /**
-     * @brief Non-blocking check for available inputs.
+     *  @brief Non-blocking check for available inputs.
      *
-     * @return 0 if inputs are available, 1 if not, and -1 if eof
+     *  @return true if inputs are available. false otherwise. If
+     *  there is no input available, it is the responsibility of the
+     *  caller to determine whether the producer has sent EOF, whether
+     *  the buffer has been terminated, or whether the buffer is
+     *  simply empty.
      */
-    int check_for_input() {
-        return read_page? 0 : page_buffer.check_readable();
+    bool check_for_input() {
+        return read_page ? true : page_buffer.check_readable();
     }
+    
+    
+    bool terminate();
 
-        
-    void close();
-    void send_eof();
+
+    bool send_eof();
+    
+    
+    /**
+     *  @brief Check if we have consumed all tuples from this
+     *  buffer.
+     *
+     *  @return Returns true only if the producer has sent EOF and we
+     *  have read every tuple of every page in this buffer. This
+     *  function returns false if the buffer has been terminated.
+     */
+    bool eof() {
+        return !page_buffer.check_readable()  // no pages available
+            &&  page_buffer.stopped_writing() // no pages coming
+            && !page_buffer.is_terminated();  // buffer not closed
+    }
 
 
     /**
-     *  @brief Check if we have consumed all tuples from this
-     *  buffer. In other words, returns true if and only if the
-     *  producer has closed its end of the buffer and we have read
-     *  every tuple of every page in this buffer.
-     *
+     *  @brief Check whether this buffer has been terminated.
      */
-
-    bool eof() {
-        return check_for_input() < 0;
+    bool is_terminated() {
+        return page_buffer.is_terminated();
     }
 
 
@@ -736,10 +756,13 @@ public:
     }
 
 
-    ~tuple_buffer_t();
+    ~tuple_buffer_t() {
+        // nothing to destroy
+    }
 
 
 protected:
+
 
     int check_page_full();
 
@@ -748,6 +771,7 @@ protected:
     int flush_write_page() {
         int result = page_buffer.write(write_page);
         if(result)
+            // Buffer was terminated! Let guard free it.
             write_page = NULL;
         else
             write_page.release();
@@ -756,41 +780,10 @@ protected:
     }
 };
 
-/**
- *  @brief Convenient wrapper around a tuple_buffer_t that will ensure
- *  that the buffer is initialized, then close it when this wrapper
- *  goes out of scope. By using this wrapper, we can avoid duplicating
- *  close() code at every exit point.
- */
-struct buffer_guard_t {
-    tuple_buffer_t *buffer;
-    buffer_guard_t(tuple_buffer_t *buf=NULL) {
-        *this = buf;
-    }
-  
-    ~buffer_guard_t() {
-        if(buffer)
-            buffer->close();
-    }
-
-    buffer_guard_t &operator=(tuple_buffer_t *buf) {
-        buffer = buf;
-        return *this;
-    }
-
-    tuple_buffer_t *operator->() {
-        return buffer;
-    }
-
-    operator tuple_buffer_t*() {
-        return buffer;
-    }
-private:
-    // no copying
-    buffer_guard_t &operator=(const buffer_guard_t &other);
-    buffer_guard_t(const buffer_guard_t &other);
-};
 
 
 #include "namespace.h"
+
+
+
 #endif

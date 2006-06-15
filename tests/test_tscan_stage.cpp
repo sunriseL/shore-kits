@@ -323,8 +323,8 @@ int main() {
 
     // TSCAN PACKET
     // the output consists of 2 doubles
-    tuple_buffer_t tscan_out_buffer(2*sizeof(double));
-    tuple_filter_t *tscan_filter = new q6_tscan_filter_t();
+    tuple_buffer_t* tscan_out_buffer = new tuple_buffer_t(2*sizeof(double));
+    tuple_filter_t* tscan_filter = new q6_tscan_filter_t();
 
 
     char* tscan_packet_id;
@@ -333,14 +333,14 @@ int main() {
     assert( tscan_packet_id_ret != -1 );
 
     tscan_packet_t* q6_tscan_packet =
-        new tscan_packet_t(tscan_packet_id, &tscan_out_buffer, tscan_filter, tpch_lineitem);
+        new tscan_packet_t(tscan_packet_id, tscan_out_buffer, tscan_filter, tpch_lineitem);
 
     // Dispatch packet
     dispatcher_t::dispatch_packet(q6_tscan_packet);
     
     tuple_t output;
     double* d = NULL;
-    while(tscan_out_buffer.get_tuple(output)) {
+    while(!tscan_out_buffer->get_tuple(output)) {
 	d = (double*)output.data;
 	TRACE(TRACE_ALWAYS, "Read ID: EXT=%lf - DISC=%lf\n", d[0], d[1]);
     }

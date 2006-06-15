@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
     
     
     // just need to pass one int at a time to the counter
-    tuple_buffer_t int_buffer(sizeof(int));
+    tuple_buffer_t* int_buffer = new tuple_buffer_t(sizeof(int));
     
     // aggregate single count result (single int)
     char* func_call_packet_id;
@@ -91,17 +91,17 @@ int main(int argc, char* argv[]) {
     
     func_call_packet_t* packet = 
 	new func_call_packet_t(func_call_packet_id,
-                               &int_buffer, 
-                               new tuple_filter_t(int_buffer.tuple_size),
+                               int_buffer, 
+                               new tuple_filter_t(int_buffer->tuple_size),
                                write_ints,
-                               &int_buffer);
+                               int_buffer);
     
     
     dispatcher_t::dispatch_packet(packet);
   
   
     tuple_t output;
-    while ( int_buffer.get_tuple(output) ) {
+    while ( !int_buffer->get_tuple(output) ) {
 	TRACE(TRACE_ALWAYS, "Read %d\n", *(int*)output.data);
     }
     TRACE(TRACE_ALWAYS, "TEST DONE\n");

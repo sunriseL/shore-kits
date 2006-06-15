@@ -108,12 +108,16 @@ public:
 
     virtual void terminate_inputs() {	
 
-	// TODO detect close() error and delete input_buffer
-	_input_buffer->close();
+        // input buffer
+        if ( !_input_buffer->terminate() ) {
+            // Producer has already terminated this buffer! We are now
+            // responsible for deleting it.
+            delete _input_buffer;
+        }
         _input_buffer = NULL;
 
-        // TODO Ask the dispatcher to clear our input packet (_input)
-        // from system, if it still exists.
+        // We don't have an input packet(s) that we need to worry
+        // about. Nothing left to do.
     }
 };
 

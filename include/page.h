@@ -24,9 +24,11 @@
 class page_t {
 
  private:
+
     size_t _page_size;
     
  public:
+
     page_t *next;
 
  public:
@@ -109,7 +111,7 @@ private:
     volatile int size;
 
     // flags used to close the buffer
-    volatile bool done_reading;
+    volatile bool terminated;
     volatile bool done_writing;
 
     // the singly-linked page list this buffer manages
@@ -132,75 +134,100 @@ public:
         init(capacity, threshold);
     }
     
+    
     ~page_buffer_t();
-
+    
+    
+    /**
+     *  @brief Check if the buffer is empty (if the producer has
+     *  stopped writing) and the consumer has completely drained the
+     *  buffer contents.
+     *
+     *  This method will not check for a closed buffer. This is
+     *  intentional. We must be able to detect and handle close() on
+     *  actual reads and writes. Otherwise, we introduce races.
+     */
     bool empty() {
-	// Since the page may continually be filled by its producer,
-	// we can be sure that the buffer is empty if and only if the
-	// producer has finished and the reader has completely drained
-	// the buffer contents.
         return stopped_writing() && read_size_guess == 0;
     }
-    page_t *read();
-    bool write(page_t *page);
-
-    /**
-     * @brief non-blocking method to check whether input is currently
-     * available.
-     *
-     * @return 0 if input is available, 1 if not, and -1 if eof
-     */
-    int check_readable();
-
-    /**
-     * @brief non-blocking method to check whether space is currently
-     * available
-     *
-     * @return 0 if there is space, 1 if not, and -1 if buffer closed
-     */
-    int check_writable();
     
-    void stop_reading();
-    void stop_writing();
+    
+    int  read(page_t*& page);
+    int  write(page_t* page);
+    bool check_readable();
+    bool check_writable();
+    
+    bool terminate();
+    bool stop_writing();
 
-    bool stopped_reading() { return done_reading; }
+    bool is_terminated() { return terminated; }
     bool stopped_writing() { return done_writing; }
     
 private:
+
     void init(int capacity, int threshold);
 
-    /**
-     * @brief determines whether we must acquire the lock and update
-     * the read size guess before it is safe to read
-     *
-     * See comments in the read() implementation about the guess == 1
-     * corner case
-     */
-    bool must_verify_read() { return read_size_guess == 1; }
-    bool must_verify_write() { return write_size_guess == capacity; }
 
     /**
-     * @brief commits any uncommitted reads. CALLER MUST HOLD THE LOCK!
+     *  @brief Called by the consumer. Checks whether it is time for
+     *  the consumer to acquire the buffer lock and update its
+     *  estimate of the number of pages in the buffer.
+     *
+     *  See comments in the read() implementation about the guess == 1
+     *  corner case.
+     *
+     *  @return true if the consumer needs to update its
+     *  estimate. false otherwise.
+     */
+    bool must_verify_read() { return read_size_guess == 1; }
+
+
+    /**
+     *  @brief Called by the producer. Checks whether it is time for
+     *  the producer to acquire the buffer lock and update its
+     *  estimate of the amount of free space in the buffer.
+     *
+     *  @return true if the producer needs to update its
+     *  estimate. false otherwise.
+     */
+    bool must_verify_write() { return write_size_guess == capacity; }
+
+
+    /**
+     *  @brief Called by the consumer. Commits consumer's uncommitted
+     *  reads so the producer can see how much space is actually in
+     *  the buffer. THE CALLER MUST HOLD THE BUFFER LOCK!
      */
     void commit_reads() {
         size -= uncommitted_read_count;
         uncommitted_read_count = 0;
     }
 
+
+    /**
+     *  @brief Called by the producer. Commits producer's uncommitted
+     *  writes so the consumer can see how much data is actually in
+     *  the buffer. THE CALLER MUST HOLD THE BUFFER LOCK!
+     */
     void commit_writes() {
         size += uncommitted_write_count;
         uncommitted_write_count = 0;
     }
 };
 
+
+
 /**
- * @brief Ensures that a list of pages allocated with malloc+placement-new is freed 
+ *  @brief Ensures that a list of pages allocated with
+ *  malloc+placement-new is freed.
  */
 struct page_list_guard_t : public pointer_guard_base_t<page_t, page_list_guard_t> {
+
     page_list_guard_t(page_t *ptr=NULL)
         : pointer_guard_base_t<page_t, page_list_guard_t>(ptr)
     {
     }
+
     struct Action {
         void operator()(page_t *ptr) {
             while(ptr) {
@@ -221,11 +248,17 @@ struct page_list_guard_t : public pointer_guard_base_t<page_t, page_list_guard_t
         assign(ref._ptr);
         return *this;
     }
+
 private:
+
     page_list_guard_t &operator=(page_list_guard_t &);
+
 };
 
 
 
 #include "namespace.h"
+
+
+
 #endif

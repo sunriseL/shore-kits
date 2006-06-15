@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     
     
     // aggregate single count result (single int)
-    tuple_buffer_t int_buffer(sizeof(int));
+    tuple_buffer_t* int_buffer = new tuple_buffer_t(sizeof(int));
 
     char* fscan_packet_id;
     int fscan_packet_id_ret =
@@ -70,14 +70,17 @@ int main(int argc, char* argv[]) {
     assert( fscan_packet_filename_ret != -1 );
     
     fscan_packet_t* packet = 
-	new fscan_packet_t(fscan_packet_id, &int_buffer, new tuple_filter_t(int_buffer.tuple_size), fscan_packet_filename);
+	new fscan_packet_t(fscan_packet_id,
+                           int_buffer,
+                           new tuple_filter_t(int_buffer->tuple_size),
+                           fscan_packet_filename);
     
     
     dispatcher_t::dispatch_packet(packet);
-  
+    
   
     tuple_t output;
-    while ( int_buffer.get_tuple(output) ) {
+    while ( !int_buffer->get_tuple(output) ) {
 	TRACE(TRACE_ALWAYS, "Read %d\n", *(int*)output.data);
     }
     TRACE(TRACE_ALWAYS, "TEST DONE\n");
