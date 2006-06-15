@@ -4,7 +4,6 @@
 INCLUDES = -I$(top_srcdir)/include -I$(top_srcdir)/include/util
 
 
-
 STAGES = \
    stages/fscan.cpp \
    stages/fdump.cpp \
@@ -14,15 +13,6 @@ STAGES = \
    stages/merge.cpp \
    stages/sort.cpp
 
-#  stages/bnl_caching_join.cpp
-
-
-TRACE = \
-   trace/trace.cpp \
-   trace/trace_force.cpp \
-   trace/trace_print_pthread.cpp \
-   trace/trace_stream.cpp
-
 DISPATCHER = \
    dispatcher.cpp
 
@@ -31,13 +21,6 @@ UTIL = \
    util/hash_functions.cpp \
    util/shuffle.cpp \
    util/time_util.cpp
-
-CATALOG = \
-   catalog/catalog.cpp
-
-JOB = \
-   job/job.cpp
-
 
 
 
@@ -50,13 +33,6 @@ libqpipe_a_SOURCES = \
    tuple.cpp \
    packet.cpp \
    stage_container.cpp \
-   $(TRACE) \
    $(DISPATCHER) \
    $(UTIL)  \
-   $(JOB) \
    $(STAGES) 
-
-#$(STAGES) \
-#   $(CATALOG)
-
-
