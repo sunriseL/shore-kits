@@ -7,6 +7,7 @@
 #include <cassert>
 #include <sys/time.h>
 #include "trace.h"
+#include <unistd.h>
 
 
 /**
@@ -184,6 +185,72 @@ struct file_guard_t : public pointer_guard_base_t<FILE, file_guard_t> {
     };
 private:
     file_guard_t &operator=(file_guard_t &);
+};
+
+/**
+ * @brief Ensures that a file descriptor gets closed
+ */
+class fd_guard_t {
+    int _fd;
+    
+public:
+    
+    struct temp_ref_t {
+        int _fd;
+        temp_ref_t(int fd)
+            : _fd(fd)
+        {
+        }
+    };
+    
+    fd_guard_t(int fd)
+        : _fd(fd)
+    {
+    }
+    fd_guard_t(const temp_ref_t &other)
+        : _fd(other._fd)
+    {
+    }
+
+    fd_guard_t &operator=(const temp_ref_t &other) {
+        assign(other._fd);
+        return *this;
+    }
+
+    operator int() {
+        return _fd;
+    }
+    
+    /**
+     * @brief Notifies this guard that its action should be performed
+     * now rather than at destruct time.
+     */
+    void done() {
+        if(_fd >= 0) {
+            close(_fd);
+            _fd = 0;
+        }
+    }
+    
+    /**
+     * @brief Notifies this guard that its services are no longer
+     * needed because some other entity has assumed ownership of the
+     * pointer. 
+     */
+    int release() {
+        int fd = _fd;
+        _fd = -1;
+        return fd;
+    }
+
+    void assign(int fd) {
+        done();
+        _fd = fd;
+    }
+    
+    ~fd_guard_t() {
+        done();
+    }
 };
 
 #endif

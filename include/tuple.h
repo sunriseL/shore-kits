@@ -49,7 +49,7 @@ class tuple_t {
 
 public:
     char* data;
-    size_t size;;
+    size_t size;
 
 
     tuple_t() {
@@ -62,8 +62,8 @@ public:
         init((char *)data.get_data(), data.get_size());
     }
     
-    tuple_t(char *data, size_t size) {
-        init(data, size);
+    tuple_t(char *d, size_t s) {
+        init(d, s);
     }
 
     /**
@@ -113,8 +113,6 @@ private:
 
 public:
 
-    template<class Alloc>
-
 
     /**
      *  @brief Allocate a new page and place a tuple_page_t as its
@@ -132,6 +130,7 @@ public:
      *  NULL). An initialized page otherwise.
      */
 
+    template<class Alloc>
     static tuple_page_t *alloc(size_t tuple_size,
 			       Alloc allocate,
 			       size_t page_size=4096) {

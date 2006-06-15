@@ -77,21 +77,7 @@
 #define __FNV_H__
 
 #include <cstdlib>
-
-/*
- * 32 bit FNV-0 hash type
- */
-typedef unsigned long Fnv32_t;
-
-
-/*
- * 32 bit FNV-0 zero initial basis
- *
- * This historic hash is not recommended.  One should use
- * the FNV-1 hash and initial basis instead.
- */
-#define FNV0_32_INIT ((Fnv32_t)0)
-
+#include <stdint.h>
 
 /*
  * 32 bit FNV-1 and FNV-1a non-zero initial basis
@@ -105,11 +91,10 @@ typedef unsigned long Fnv32_t;
  *
  * NOTE: The FNV-1a initial basis is the same value as FNV-1 by definition.
  */
-#define FNV1_32_INIT ((Fnv32_t)0x811c9dc5)
-#define FNV1_32A_INIT FNV1_32_INIT
+static const uint32_t FNV_INIT = (uint32_t) 0x811c9dc5;
 
 
-extern Fnv32_t fnv_32_buf(void *buf, size_t len, Fnv32_t hashval);
+extern uint32_t fnv_hash(const char *buf, size_t len, uint32_t hashval=FNV_INIT);
 
 
 #endif /* __FNV_H__ */

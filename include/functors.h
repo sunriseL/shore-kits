@@ -82,9 +82,30 @@ public:
 
 class tuple_join_t {
 
+    size_t _left_tuple_size;
+    size_t _right_tuple_size;
+    size_t _out_tuple_size;
+    size_t _key_size;
 public:
 
+    size_t left_tuple_size() { return _left_tuple_size; }
+    size_t right_tuple_size() { return _right_tuple_size; }
+    size_t out_tuple_size() { return _out_tuple_size; }
+    size_t key_size() { return _key_size; }
 
+    tuple_join_t(size_t left_tuple_size,
+                 size_t right_tuple_size,
+                 size_t out_tuple_size,
+                 size_t key_size)
+        : _left_tuple_size(left_tuple_size),
+          _right_tuple_size(right_tuple_size),
+          _out_tuple_size(out_tuple_size),
+          _key_size(key_size)
+    {
+    }
+    virtual void get_left_key(char *key, const tuple_t &tuple)=0;
+    virtual void get_right_key(char *key, const tuple_t &tuple)=0;
+    
     /**
      *  @brief Determine whether two tuples pass an internal set of join
      *  predicates. Should be applied within a join stage.
@@ -100,10 +121,11 @@ public:
      *  predicates. False otherwise.
      */
 
-    virtual bool join(tuple_t &dest,
+    virtual void join(tuple_t &dest,
                       const tuple_t &left,
                       const tuple_t &right)=0;
-    
+
+    // TODO: implement a join function that tests the predicates first
     virtual ~tuple_join_t() { }
 };
 
@@ -179,6 +201,18 @@ struct key_tuple_pair_t {
  */
 
 struct tuple_comparator_t {
+    bool _extended;
+
+    /**
+     * @brief constructs a new tuple comparator.
+     *
+     * @param extended true if the key stored in a key/tuple pair is
+     * insufficient to determine equality. 
+     */
+    tuple_comparator_t(bool extended)
+        : _extended(extended)
+    {
+    }
     
     /**
      * @brief Determines the lexicographical relationship between
@@ -189,9 +223,19 @@ struct tuple_comparator_t {
      * @return negative if a < b, positive if a > b, and zero if a == b
      */
     
-    virtual int compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b)=0;
+    int compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b) {
+        int diff = a.key - b.key;
+        return (!_extended || diff)? diff : full_compare(a, b);
+    }
 
 
+    /**
+     * @brief Completes a comparison between two key/tuple pairs with
+     * the same "key" value. This function will only be called if the
+     * keys of both key/tuple pairs are equal and extended key
+     * comparisons are required to break the tie.
+     */
+    virtual int full_compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b)=0;
 
     /**
      * @brief returns the 32-bit key this comparator uses for primary

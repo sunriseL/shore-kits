@@ -27,65 +27,115 @@ using namespace qpipe;
 
 class hash_join_packet_t : public packet_t {
 public:
+    static const char *PACKET_TYPE;
 
-  int hash_join_id;
+    packet_t *_left;
+    packet_t *_right;
+    tuple_buffer_t *_left_buffer;
+    tuple_buffer_t *_right_buffer;
 
-  join_functor_t* join_func;
+    tuple_join_t *_join;
+    
+    int count_out;
+    int count_left;
+    int count_right;
   
-  size_t join_buffer_size;
-  int num_partitions;	// number of partitions in hybrid hash-join
+    /**
+     *  @brief sort_packet_t constructor.
+     *
+     *  @param packet_id The ID of this packet. This should point to a
+     *  block of bytes allocated with malloc(). This packet will take
+     *  ownership of this block and invoke free() when it is
+     *  destroyed.
+     *
+     *  @param output_buffer The buffer where this packet should send
+     *  its data. A packet DOES NOT own its output buffer (we will not
+     *  invoke delete or free() on this field in our packet
+     *  destructor).
+     *
+     *  @param output_filter The filter that will be applied to any
+     *  tuple sent to output_buffer. The packet OWNS this filter. It
+     *  will be deleted in the packet destructor.
+     *
+     *  @param left Left side-input packet. This will be dispatched
+     *  first and become the outer relation of the join. This should
+     *  be the smaller input.
+     *
+     *  @param right Right-side packet. This will be dispatched after
+     *  the partitioning stage and will become the inner relation of
+     *  the join. It should be the larger input.
+     *
+     *  @param join The joiner  we will be using for this
+     *  packet. The packet OWNS this joiner. It will be deleted in
+     *  the packet destructor.
+     *
+     */
+    hash_join_packet_t(char *packet_id,
+                       tuple_buffer_t* out_buffer,
+                       tuple_filter_t *output_filter,
+                       packet_t* left,
+                       packet_t* right,
+                       tuple_join_t *join)
+        : packet_t(packet_id, PACKET_TYPE, out_buffer, output_filter),
+          _left(left), _right(right),
+          _left_buffer(left->_output_buffer),
+          _right_buffer(right->_output_buffer),
+          _join(join)
+    {
+    }
   
-  tuple_buffer_t* input_buffer1;
-  tuple_buffer_t* input_buffer2;
-  
-  int join_attribute_offset1;
-  int join_attribute_offset2;
-    // field_count | offset0 | offset1 | offset2 | ... | offsetN-1 |
-  int join_length;
+    virtual void terminate_inputs() {
+        if(!_left_buffer->terminate())
+            delete _left_buffer;
+        if(!_right_buffer->terminate())
+            delete _right_buffer;
+    }
 
-  bool equality_test;  // true: join tuples with equal keys. false: join tuples with not equal keys (e.g., NOT IN )
-  
-  int count_out;
-  int count_left;
-  int count_right;
-  
-  hash_join_packet_t(char* packet_id,
-                     tuple_buffer_t* out_buffer,
-                     tuple_buffer_t* in_buffer1,
-                     tuple_buffer_t* in_buffer2,
-                     int join_attr_offset1,
-                     int join_attr_offset2,
-                     size_t buffer_size,
-                     int n_partitions,
-                     join_functor_t* func,
-                     bool equality_test_flag = true,
-                     int length = 1);
-  
-  ~hash_join_packet_t();
-  
-  virtual bool mergable(stage_packet_t*);  
-  virtual void link_packet(stage_packet_t* packet);
+    virtual void destroy_subpackets() {
+        _left->destroy_subpackets();
+        delete _left_buffer;
+        delete _left;
+
+        _right->destroy_subpackets();
+        delete _right_buffer;
+        delete _right;
+    }
 };
-
-
-struct int_hasher {
-  size_t operator()(const int& x) { return (size_t)x; }
-};
-
-
-struct int_equal {
-  bool operator()(const int& x, const int& y) { return x == y; }
-};
-
 
 
 /*******************
  * hash_join_stage *
  *******************/
+using __gnu_cxx::hashtable;
+using std::string;
+using std::vector;
 
+class hash_join_stage_t : public stage_t {
+    struct hash_key_t;
+    
+    template <bool left>
+    struct extract_key_t;
+    
+    struct equal_key_t;
 
-class hash_join_stage : public qpipe_stage {
-  typedef hash_table<int, char*, int_hasher, int_equal > tuple_hash_t;
+    /**
+     * Abuse the flexibility of the base STL hashtable implementation
+     * to avoid storing tuple keys.
+     *
+     * The key extractor maintains internal space to hold the
+     * key. When asked to extract a key it returns a pointer to this
+     * initial space after filling it based on the tuple it was
+     * given. Since this may be called more than once per expression
+     * (see the implementation) the extractor actually maintains space
+     * for two keys, alternating which pointer it returns.
+     *
+     * The key equality test simply performs a bytewise comparison of
+     * the two keys it is given.
+     */
+    typedef hashtable<char *, char *,
+                      hash_key_t,
+                      extract_key_t<true>,
+                      equal_key_t> tuple_hash_t;
   
     /* Reads tuples from the given source to build an in-memory hash table
      */
@@ -97,44 +147,47 @@ class hash_join_stage : public qpipe_stage {
     hash_join_packet_t *probe_matches(tuple_hash_t &probe_table,
                                       hash_join_packet_t *packet,
                                       TupleSource source);
+
+    struct partition_t {
+        tuple_page_t *page;
+        int size;
+        FILE *file;
+        string file_name1;
+        string file_name2;
+        partition_t()
+            : page(NULL), size(0), file(NULL)
+        {
+        }
+    };
+
+    typedef vector<partition_t> partition_list_t;
+    partition_list_t partitions;
     
+    int page_quota;
+    int page_count;
+
+    tuple_join_t *_join;
 public:
 
-  bool is_runnable();
-  void enqueue(stage_packet_t* packet);
-  int dequeue();
+    virtual result_t process_packet();
+    
+    // set up the partitions in memory
+    hash_join_stage_t()
+        : partitions(512),
+          page_quota(10000), page_count(0)
+    {
+    }
 
-  int count_out;
-  int count_left;
-  int count_right;
+    ~hash_join_stage_t() {
+    }
 
-  stage_queue_t* side_queue;
+private:
+    int test_overflow(int partition);
 
-  int join_partition(int partition_num, hash_table<int, tuple_t*, int_hasher, int_equal > &probe_table, hash_join_packet_t* packet, int left_tuple_size, int right_tuple_size);
-
-  int gen_multi_key(int* keyloc, int keylen);
-
-  int free_probe_table(tuple_hash_t &probe_table);
-
-  int cleanup(tuple_hash_t &probe_table, hash_join_packet_t* packet);
-
-  hash_join_packet_t* process_tuple(const tuple_t* left_tuple,
-                                    const tuple_t* right_tuple,
-                                    hash_join_packet_t* packet);
-
-  hash_join_stage(const char* sname) : qpipe_stage(sname) {
-    side_queue = new stage_queue_t(sname);
-    count_out = 0; 
-    count_left = 0; 
-    count_right = 0;
-
-    stage_type = STAGE_HASH_JOIN;
-  }
-
-  ~hash_join_stage() {
-
-    delete side_queue;
-  }
+    struct left_action_t;
+    struct right_action_t;
+    template<class Action>
+    int close_file(partition_list_t::iterator it, Action a);
 };
 
 #endif	// __HASH_JOIN_H
