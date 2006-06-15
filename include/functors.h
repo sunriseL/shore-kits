@@ -209,7 +209,7 @@ struct tuple_comparator_t {
      * @param extended true if the key stored in a key/tuple pair is
      * insufficient to determine equality. 
      */
-    tuple_comparator_t(bool extended)
+    tuple_comparator_t(bool extended=false)
         : _extended(extended)
     {
     }
@@ -235,7 +235,9 @@ struct tuple_comparator_t {
      * keys of both key/tuple pairs are equal and extended key
      * comparisons are required to break the tie.
      */
-    virtual int full_compare(const key_tuple_pair_t &a, const key_tuple_pair_t &b)=0;
+    virtual int full_compare(const key_tuple_pair_t &, const key_tuple_pair_t &) {
+        assert(false);
+    }   
 
     /**
      * @brief returns the 32-bit key this comparator uses for primary

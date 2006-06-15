@@ -232,10 +232,6 @@ public:
 
 // "order by L_RETURNFLAG, L_LINESTATUS"
 struct q1_tuple_comparator_t : public tuple_comparator_t {
-    virtual int compare(const key_tuple_pair_t &ta, const key_tuple_pair_t &tb) {
-        // this is all it takes since both are chars (2 < sizeof(int))
-        return ta.key - tb.key;
-    }
     virtual int make_key(const tuple_t &tuple) {
         // store the return flag and line status in the 
         projected_lineitem_tuple *item;

@@ -4,7 +4,7 @@
 #include "stages/merge.h"
 #include "stages/fdump.h"
 #include "stages/fscan.h"
-#include "trace/trace.h"
+#include "trace.h"
 #include "qpipe_panic.h"
 #include "util/tmpfile.h"
 #include "utils.h"
