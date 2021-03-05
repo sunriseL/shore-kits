@@ -1,6 +1,6 @@
 // -*- mode:C++; c-basic-offset:4 -*-
-#ifndef __EXCEPTION_H
-#define __EXCEPTION_H
+#ifndef ___EXCEPTION_H
+#define ___EXCEPTION_H
 
 #include <exception>
 #include <cstring>
